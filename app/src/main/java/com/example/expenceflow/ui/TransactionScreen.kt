@@ -1,10 +1,15 @@
 package com.example.expenceflow.ui
 import androidx.compose.ui.graphics.SolidColor
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +27,7 @@ import com.example.expenceflow.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionScreen(
     viewModel: TransactionViewModel = hiltViewModel()
@@ -34,6 +40,45 @@ fun TransactionScreen(
     var category by remember { mutableStateOf("Food") }
     var type by remember { mutableStateOf("Expense") }
     var account by remember { mutableStateOf("Cash") }
+    var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedDate = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                    showDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
+    if (editingTransaction != null) {
+        EditTransactionDialog(
+            transaction = editingTransaction!!,
+            onDismiss = { editingTransaction = null },
+            onSave = { updatedTx ->
+                viewModel.updateTransaction(updatedTx)
+                editingTransaction = null
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -174,6 +219,37 @@ fun TransactionScreen(
                         )
                     )
 
+                    Spacer(Modifier.height(12.dp))
+
+                    // 📅 DATE PICKER
+                    OutlinedCard(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(Date(selectedDate)),
+                                color = Color.White
+                            )
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Select Date",
+                                tint = GoldAccent
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(16.dp))
 
                     Button(
@@ -185,6 +261,7 @@ fun TransactionScreen(
                                     amount = amt,
                                     type = type,
                                     category = "$category • $account",
+                                    date = selectedDate,
                                     context = context
                                 )
                                 description = ""
@@ -192,6 +269,7 @@ fun TransactionScreen(
                                 category = "Food"
                                 account = "Cash"
                                 type = "Expense"
+                                selectedDate = System.currentTimeMillis()
                             } else {
                                 Toast.makeText(
                                     context,
@@ -238,7 +316,11 @@ fun TransactionScreen(
             } else {
                 LazyColumn {
                     items(transactions, key = { it.id }) { tx ->
-                        TransactionItem(tx)
+                        TransactionItem(
+                            transaction = tx,
+                            onEdit = { editingTransaction = tx },
+                            onDelete = { viewModel.deleteTransaction(tx) }
+                        )
                     }
                 }
             }
@@ -247,11 +329,73 @@ fun TransactionScreen(
 }
 
 /* -------------------------------------------------- */
+/* ---------------- EDIT DIALOG --------------------- */
+/* -------------------------------------------------- */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditTransactionDialog(
+    transaction: Transaction,
+    onDismiss: () -> Unit,
+    onSave: (Transaction) -> Unit
+) {
+    var title by remember { mutableStateOf(transaction.title) }
+    var amount by remember { mutableStateOf(transaction.amount.toString()) }
+    var date by remember { mutableStateOf(transaction.date) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    date = datePickerState.selectedDateMillis ?: date
+                    showDatePicker = false
+                }) { Text("OK") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Transaction") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") })
+                OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") })
+                
+                OutlinedCard(onClick = { showDatePicker = true }) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(Date(date)))
+                        Icon(Icons.Default.DateRange, null)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val amt = amount.toDoubleOrNull() ?: transaction.amount
+                onSave(transaction.copy(title = title, amount = amt, date = date))
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+/* -------------------------------------------------- */
 /* ---------------- TRANSACTION ITEM ---------------- */
 /* -------------------------------------------------- */
 
 @Composable
-fun TransactionItem(transaction: Transaction) {
+fun TransactionItem(
+    transaction: Transaction,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
 
     val dateFormat = remember {
         SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -297,15 +441,35 @@ fun TransactionItem(transaction: Transaction) {
                 )
             }
 
-            Text(
-                text = "₹${transaction.amount}",
-                fontWeight = FontWeight.Bold,
-                color =
-                    if (transaction.type == "Expense")
-                        ErrorRed
-                    else
-                        SuccessGreen
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "₹${transaction.amount}",
+                    fontWeight = FontWeight.Bold,
+                    color =
+                        if (transaction.type == "Expense")
+                            ErrorRed
+                        else
+                            SuccessGreen
+                )
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            modifier = Modifier.size(18.dp),
+                            tint = GoldAccent
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            modifier = Modifier.size(18.dp),
+                            tint = ErrorRed
+                        )
+                    }
+                }
+            }
         }
     }
 }

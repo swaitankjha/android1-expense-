@@ -3,6 +3,7 @@ package com.example.expenceflow.ui.setting
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -15,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
 
 @Composable
 fun ImprovementScreen(
@@ -69,14 +72,38 @@ fun ImprovementScreen(
                 } else if (!isInternetAvailable(context)) {
                     Toast.makeText(context, "No internet connection", Toast.LENGTH_SHORT).show()
                 } else {
-                    // 🔥 FUTURE IDEA:
-                    // Send this text to Firebase / Email / Google Form
-                    Toast.makeText(
-                        context,
-                        "Thanks! Your message is sent 🙌",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    text = ""
+                    val db = FirebaseFirestore.getInstance()
+
+                    val deviceId = getDeviceId(context)
+
+                    val feedback = hashMapOf(
+                        "message" to text,
+                        "deviceId" to deviceId,
+                        "appVersion" to "2.1.0",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+
+                    db.collection("feedback")
+                        .document(deviceId)
+                        .set(feedback)
+                        .addOnSuccessListener {
+
+                            Toast.makeText(
+                                context,
+                                "Thanks! Your feedback was sent 🙌",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            text = ""
+                        }
+                        .addOnFailureListener {
+
+                            Toast.makeText(
+                                context,
+                                "Failed to send feedback",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                 }
             }
         ) {
@@ -92,4 +119,8 @@ fun isInternetAvailable(context: Context): Boolean {
     val network = cm.activeNetwork ?: return false
     val capabilities = cm.getNetworkCapabilities(network) ?: return false
     return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+fun getDeviceId(context: Context): String {
+    return Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown"
 }

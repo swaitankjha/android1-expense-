@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1004513634704",
+    "project_id": "azalia-ec435",
+    "storage_bucket": "azalia-ec435.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004513634704:android:1e33ca94f3fdfc91d12b15",
+        "android_client_info": {
+          "package_name": "com.example.azalea"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvF6938kavNiTBq1fLiyXXVd7ZmgM2d0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004513634704:android:c1acbf86603f300bd12b15",
+        "android_client_info": {
+          "package_name": "com.example.expenceflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvF6938kavNiTBq1fLiyXXVd7ZmgM2d0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -95,12 +95,6 @@ fun SettingScreen(
 
 
 
-        Text(
-            text = "Internal • Users counted: $internalUserCount",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
 
         Spacer(Modifier.height(12.dp))
     }

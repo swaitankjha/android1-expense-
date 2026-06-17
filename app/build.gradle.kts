@@ -3,10 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-
-    id("com.google.devtools.ksp")
-    id("com.google.dagger.hilt.android")
-    id("org.jetbrains.kotlin.kapt")
+    id("com.google.gms.google-services")
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -49,6 +48,7 @@ android {
 
 dependencies {
 
+
     /* -------------------- Compose & UI -------------------- */
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -70,28 +70,24 @@ dependencies {
     /* -------------------- Navigation -------------------- */
     implementation(libs.androidx.navigation.compose)
 
-    /* -------------------- 🔥 HILT (EXPLICIT – FIX) -------------------- */
-    implementation("com.google.dagger:hilt-android:2.52")
-    kapt("com.google.dagger:hilt-android-compiler:2.52")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    /* -------------------- 🔥 HILT -------------------- */
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler)
+    implementation(libs.hilt.navigation.compose)
 
     /* -------------------- ROOM -------------------- */
-    implementation("androidx.room:room-runtime:2.7.1")
-    implementation("androidx.room:room-ktx:2.7.1")
-    ksp("androidx.room:room-compiler:2.7.1")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
 
     // Retrofit
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging.interceptor)
 // Moshi
-    implementation("com.squareup.moshi:moshi:1.15.0")
-    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
-
-// OkHttp
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.moshi.core)
+    implementation(libs.moshi.kotlin)
 
 
     /* -------------------- Serialization -------------------- */
@@ -103,6 +99,8 @@ dependencies {
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
 
+    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    implementation("com.google.firebase:firebase-firestore")
     /* -------------------- Testing -------------------- */
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

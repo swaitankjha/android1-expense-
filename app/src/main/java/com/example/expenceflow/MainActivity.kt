@@ -1,5 +1,5 @@
 package com.example.expenceflow
-
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,7 +10,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,7 +31,9 @@ import com.example.expenceflow.ui.setting.*
 import com.example.expenceflow.ui.theme.ExpenceFlowTheme
 import com.example.expenceflow.ui.transaction.TransactionViewModel
 import dagger.hilt.android.AndroidEntryPoint
-
+import androidx.compose.material.icons.filled.List
+import com.example.expenceflow.ui.LiveRatesScreen
+import androidx.compose.material.icons.filled.AttachMoney
 /* ---------------- BOTTOM NAV ---------------- */
 
 sealed class BottomNavScreen(
@@ -40,6 +45,7 @@ sealed class BottomNavScreen(
     object Graph : BottomNavScreen("graph", "Graph", Icons.Default.ShowChart)
     object Transaction : BottomNavScreen("transaction", "Transaction", Icons.Default.List)
     object Setting : BottomNavScreen("setting", "Setting", Icons.Default.Settings)
+    object LiveRates : BottomNavScreen("live_rates", "Live Rates", Icons.Default.AttachMoney)
 }
 
 @AndroidEntryPoint
@@ -73,7 +79,8 @@ class MainActivity : ComponentActivity() {
                 settingsViewModel.loadTheme(context)
             }
 
-            val isDarkModeEnabled by settingsViewModel.isDarkModeEnabled.collectAsState()
+            val isDarkModeEnabled by
+            settingsViewModel.isDarkModeEnabled.collectAsStateWithLifecycle()
 
             ExpenceFlowTheme(darkTheme = isDarkModeEnabled) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -158,8 +165,12 @@ fun BottomNavApp(
                     onBack = { navController.popBackStack() }
                 )
             }
+// 💰 LIVE RATES
+            composable(BottomNavScreen.LiveRates.route) {
+                LiveRatesScreen()
+            }
 
-            // ℹ️ ABOUT
+// ℹ️ ABOUT
             composable("settings/about") {
                 AboutScreen(
                     onBack = { navController.popBackStack() }
@@ -177,6 +188,7 @@ fun BottomNavigationBar(navController: NavHostController) {
         BottomNavScreen.Home,
         BottomNavScreen.Graph,
         BottomNavScreen.Transaction,
+        BottomNavScreen.LiveRates,
         BottomNavScreen.Setting
     )
 

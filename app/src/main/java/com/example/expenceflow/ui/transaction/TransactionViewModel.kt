@@ -44,6 +44,7 @@ class TransactionViewModel @Inject constructor(
         amount: Double,
         type: String,
         category: String,
+        date: Long,
         context: Context
     ) {
         viewModelScope.launch {
@@ -52,7 +53,7 @@ class TransactionViewModel @Inject constructor(
             val transaction = Transaction(
                 title = title,
                 amount = amount,
-                date = System.currentTimeMillis(),
+                date = date,
                 type = type,
                 category = category
             )
