@@ -6,8 +6,10 @@ import android.net.NetworkCapabilities
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,104 +17,119 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.UUID
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImprovementScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
+    var isSending by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-    ) {
-
-        // 🔙 TOP BAR
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-            }
-            Text(
-                text = "Help Improve ExpenseFlow",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Feedback", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
-
-        Spacer(Modifier.height(24.dp))
-
-        Text(
-            text = "Found a bug or have an idea?\nTell me what I can improve 👇",
-            fontSize = 14.sp
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = { Text("Write here…") },
+    ) { padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(140.dp)
-        )
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp)
+        ) {
+            Text(
+                text = "Help us improve",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
+            )
+            
+            Spacer(Modifier.height(8.dp))
 
-        Spacer(Modifier.height(24.dp))
+            Text(
+                text = "Found a bug or have an idea? Tell us what we can improve to make your experience better.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-        Button(
-            modifier = Modifier.align(Alignment.End),
-            onClick = {
-                if (text.isBlank()) {
-                    Toast.makeText(context, "Please write something", Toast.LENGTH_SHORT).show()
-                } else if (!isInternetAvailable(context)) {
-                    Toast.makeText(context, "No internet connection", Toast.LENGTH_SHORT).show()
-                } else {
+            Spacer(Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("Write your feedback here...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                enabled = text.isNotBlank() && !isSending,
+                onClick = {
+                    if (!isInternetAvailable(context)) {
+                        Toast.makeText(context, "No internet connection", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    
+                    isSending = true
                     val db = FirebaseFirestore.getInstance()
-
                     val deviceId = getDeviceId(context)
 
                     val feedback = hashMapOf(
                         "message" to text,
                         "deviceId" to deviceId,
-                        "appVersion" to "2.1.0",
+                        "appVersion" to "1.0.0",
                         "timestamp" to System.currentTimeMillis()
                     )
 
                     db.collection("feedback")
-                        .document(deviceId)
+                        .document(deviceId + "_" + System.currentTimeMillis())
                         .set(feedback)
                         .addOnSuccessListener {
-
-                            Toast.makeText(
-                                context,
-                                "Thanks! Your feedback was sent 🙌",
-                                Toast.LENGTH_LONG
-                            ).show()
-
+                            Toast.makeText(context, "Feedback sent! Thanks! 🙌", Toast.LENGTH_LONG).show()
                             text = ""
+                            isSending = false
+                            onBack()
                         }
                         .addOnFailureListener {
-
-                            Toast.makeText(
-                                context,
-                                "Failed to send feedback",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(context, "Failed to send feedback", Toast.LENGTH_SHORT).show()
+                            isSending = false
                         }
                 }
+            ) {
+                if (isSending) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Send, null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Send Feedback", fontWeight = FontWeight.Bold)
+                }
             }
-        ) {
-            Text("Submit")
+            
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
-
-/* ---------------- INTERNET CHECK ---------------- */
 
 fun isInternetAvailable(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

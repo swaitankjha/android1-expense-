@@ -9,4 +9,5 @@ sealed class BottomNavScreen(val route: String, val title: String, val icon: Ima
     object Graph : BottomNavScreen("graph", "Graph", Icons.Default.ShowChart)
     object Transaction : BottomNavScreen("transaction", "Transaction", Icons.Default.List)
     object Setting : BottomNavScreen("setting", "Setting", Icons.Default.Settings)
+    object LiveRates : BottomNavScreen("live_rates", "Live Rates", Icons.Default.AttachMoney)
 }

@@ -9,7 +9,8 @@ data class Transaction(
     val id: Long = 0,
     val title: String,
     val amount: Double,
-    val date: Long, // Changed from Date to Long (timestamp) to simplify Room storage
+    val date: Long,
     val type: String, // e.g., "Income", "Expense"
-    val category: String // e.g., "Food", "Salary"
+    val category: String, // e.g., "Food", "Salary"
+    val account: String = "Cash" // Added account field for multiple account support
 )

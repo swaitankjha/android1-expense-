@@ -1,5 +1,5 @@
 package com.example.expenceflow
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -8,21 +8,32 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import com.example.expenceflow.ui.LiveRatesScreen
 import com.example.expenceflow.ui.TransactionScreen
 import com.example.expenceflow.ui.alltransactions.AllTransactionsScreen
 import com.example.expenceflow.ui.graph.GraphScreen
@@ -30,23 +41,8 @@ import com.example.expenceflow.ui.home.DashboardScreen
 import com.example.expenceflow.ui.setting.*
 import com.example.expenceflow.ui.theme.ExpenceFlowTheme
 import com.example.expenceflow.ui.transaction.TransactionViewModel
+import com.example.expenceflow.ui.BottomNavScreen
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.compose.material.icons.filled.List
-import com.example.expenceflow.ui.LiveRatesScreen
-import androidx.compose.material.icons.filled.AttachMoney
-/* ---------------- BOTTOM NAV ---------------- */
-
-sealed class BottomNavScreen(
-    val route: String,
-    val title: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector
-) {
-    object Home : BottomNavScreen("home", "Home", Icons.Default.Home)
-    object Graph : BottomNavScreen("graph", "Graph", Icons.Default.ShowChart)
-    object Transaction : BottomNavScreen("transaction", "Transaction", Icons.Default.List)
-    object Setting : BottomNavScreen("setting", "Setting", Icons.Default.Settings)
-    object LiveRates : BottomNavScreen("live_rates", "Live Rates", Icons.Default.AttachMoney)
-}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -60,27 +56,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 🔔 Android 13+ notification permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
         setContent {
             val context = LocalContext.current
-
-            // 🔥 Load saved dark mode once
-            LaunchedEffect(Unit) {
-                settingsViewModel.loadTheme(context)
-            }
-
-            val isDarkModeEnabled by
-            settingsViewModel.isDarkModeEnabled.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { settingsViewModel.loadTheme(context) }
+            val isDarkModeEnabled by settingsViewModel.isDarkModeEnabled.collectAsStateWithLifecycle()
 
             ExpenceFlowTheme(darkTheme = isDarkModeEnabled) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -95,8 +80,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ---------------- NAV HOST ---------------- */
-
 @Composable
 fun BottomNavApp(
     transactionViewModel: TransactionViewModel,
@@ -104,86 +87,40 @@ fun BottomNavApp(
     startScreen: String?
 ) {
     val navController = rememberNavController()
-
-    // ✅ THIS IS THE MAGIC
-    val startDestination =
-        if (startScreen == "transaction")
-            BottomNavScreen.Transaction.route
-        else
-            BottomNavScreen.Home.route
+    val startDestination = if (startScreen == "transaction") BottomNavScreen.Transaction.route else BottomNavScreen.Home.route
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { CreativeBottomBar(navController) }
     ) { padding ->
-
         NavHost(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.padding(padding)
         ) {
-
-            // 🏠 DASHBOARD
             composable(BottomNavScreen.Home.route) {
                 DashboardScreen(
                     viewModel = transactionViewModel,
-                    onViewAllClick = {
-                        navController.navigate("all_transactions")
-                    },
+                    onViewAllClick = { navController.navigate("all_transactions") },
                     onExportExcel = {}
                 )
             }
-
-            // 👀 ALL TRANSACTIONS (hidden)
             composable("all_transactions") {
-                AllTransactionsScreen(
-                    viewModel = transactionViewModel,
-                    onBack = { navController.popBackStack() }
-                )
+                AllTransactionsScreen(viewModel = transactionViewModel, onBack = { navController.popBackStack() })
             }
-
-            // 📊 GRAPH
-            composable(BottomNavScreen.Graph.route) {
-                GraphScreen(transactionViewModel)
-            }
-
-            // 🧾 TRANSACTION
-            composable(BottomNavScreen.Transaction.route) {
-                TransactionScreen(viewModel = transactionViewModel)
-            }
-
-            // ⚙️ SETTINGS
+            composable(BottomNavScreen.Graph.route) { GraphScreen(transactionViewModel) }
+            composable(BottomNavScreen.Transaction.route) { TransactionScreen(viewModel = transactionViewModel) }
             composable(BottomNavScreen.Setting.route) {
-                SettingScreen(
-                    settingsViewModel = settingsViewModel,
-                    navController = navController
-                )
+                SettingScreen(settingsViewModel = settingsViewModel, navController = navController)
             }
-
-            // 🚀 IMPROVEMENT
-            composable("settings/improvement") {
-                ImprovementScreen(
-                    onBack = { navController.popBackStack() }
-                )
-            }
-// 💰 LIVE RATES
-            composable(BottomNavScreen.LiveRates.route) {
-                LiveRatesScreen()
-            }
-
-// ℹ️ ABOUT
-            composable("settings/about") {
-                AboutScreen(
-                    onBack = { navController.popBackStack() }
-                )
-            }
+            composable("settings/improvement") { ImprovementScreen(onBack = { navController.popBackStack() }) }
+            composable(BottomNavScreen.LiveRates.route) { LiveRatesScreen() }
+            composable("settings/about") { AboutScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }
 
-/* ---------------- BOTTOM BAR ---------------- */
-
 @Composable
-fun BottomNavigationBar(navController: NavHostController) {
+fun CreativeBottomBar(navController: NavHostController) {
     val items = listOf(
         BottomNavScreen.Home,
         BottomNavScreen.Graph,
@@ -192,25 +129,61 @@ fun BottomNavigationBar(navController: NavHostController) {
         BottomNavScreen.Setting
     )
 
-    NavigationBar {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
-        items.forEach { screen ->
-            NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = screen.title) },
-                label = { Text(screen.title) },
-                selected = currentRoute == screen.route,
-                onClick = {
-                    navController.navigate(screen.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+    Surface(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+            .height(80.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        tonalElevation = 12.dp,
+        shadowElevation = 16.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { screen ->
+                val selected = currentRoute == screen.route
+                val scale by animateFloatAsState(if (selected) 1.2f else 1f)
+                val iconColor by animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .clickable {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = screen.icon,
+                            contentDescription = screen.title,
+                            tint = iconColor,
+                            modifier = Modifier.scale(scale).size(24.dp)
+                        )
+                        if (selected) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
                 }
-            )
+            }
         }
     }
 }

@@ -86,19 +86,24 @@ class LiveRatesViewModel : ViewModel() {
             .create(MarketApi::class.java)
 
     init {
-        refreshRates()
+        // Only fetch if we don't have data yet
+        if (_marketState.value is MarketUiState.Loading) {
+            refreshRates()
+        }
     }
 
-    fun refreshRates() {
-
+    fun refreshRates(force: Boolean = false) {
+        if (!force && _isRefreshing.value) return
+        
         viewModelScope.launch {
-
             try {
-
                 _isRefreshing.value = true
-
-                _marketState.value =
-                    MarketUiState.Loading
+                // If it's a manual refresh (force), we might want to keep the old data visible
+                if (force) {
+                    // Stay in success but show loading indicator via _isRefreshing
+                } else {
+                    _marketState.value = MarketUiState.Loading
+                }
 
                 val response =
                     api.getMarketData()

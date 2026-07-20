@@ -7,29 +7,43 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-/* ---------------- COLORS ---------------- */
-
-// 🌞 Light (Gold)
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFFB68D40),          // gold accent
-    background = Color(0xFFFFF1C1),       // 💛 GOLD background
-    surface = Color.White,
-    onPrimary = Color.White,
-    onBackground = Color(0xFF3A2E0F),     // dark brown text
-    onSurface = Color.Black,
+    primary = LightPrimary,
+    onPrimary = LightOnPrimary,
+    primaryContainer = LightPrimaryContainer,
+    onPrimaryContainer = LightOnPrimaryContainer,
+    secondary = LightSecondary,
+    onSecondary = LightOnSecondary,
+    secondaryContainer = LightSecondaryContainer,
+    onSecondaryContainer = LightOnSecondaryContainer,
+    background = LightBackground,
+    onBackground = LightOnBackground,
+    surface = LightSurface,
+    onSurface = LightOnSurface,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    error = Error,
+    onError = Color.White
 )
 
-// 🌙 Dark
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFB68D40),          // same gold accent
-    background = Color(0xFF121212),       // dark bg
-    surface = Color(0xFF1C1B17),
-    onPrimary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White,
+    primary = DarkPrimary,
+    onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
+    secondary = DarkSecondary,
+    onSecondary = DarkOnSecondary,
+    secondaryContainer = DarkSecondaryContainer,
+    onSecondaryContainer = DarkOnSecondaryContainer,
+    background = DarkBackground,
+    onBackground = DarkOnBackground,
+    surface = DarkSurface,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    error = Error,
+    onError = Color.White
 )
-
-/* ---------------- THEME ---------------- */
 
 @Composable
 fun ExpenceFlowTheme(
@@ -37,7 +51,8 @@ fun ExpenceFlowTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    AppThemeState.isDark.value = darkTheme   // 🔥 THIS LINE
+    AppThemeState.isDark.value = darkTheme
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,

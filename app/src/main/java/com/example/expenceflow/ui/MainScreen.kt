@@ -2,7 +2,6 @@ package com.example.expenceflow.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Home
@@ -33,6 +32,7 @@ fun MainScreen() {
         BottomNavScreen.Home,
         BottomNavScreen.Graph,
         BottomNavScreen.Transaction,
+        BottomNavScreen.LiveRates,
         BottomNavScreen.Setting
     )
 
@@ -90,7 +90,9 @@ fun MainScreen() {
                         TransactionScreen(viewModel = transactionViewModel)
                     }
 
-
+                    BottomNavScreen.LiveRates -> {
+                        LiveRatesScreen()
+                    }
 
                     BottomNavScreen.Setting -> {
                         SettingScreen(
