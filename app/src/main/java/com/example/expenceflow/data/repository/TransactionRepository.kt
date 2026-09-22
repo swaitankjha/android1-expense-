@@ -14,6 +14,18 @@ class TransactionRepository @Inject constructor(
         return transactionDao.getAllTransactions()
     }
 
+    fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>> {
+        return transactionDao.getTransactionsByAccount(accountId)
+    }
+
+    suspend fun getTransactionCountForAccount(accountId: Long): Int {
+        return transactionDao.getTransactionCountForAccount(accountId)
+    }
+
+    suspend fun moveTransactionsToAccount(oldAccountId: Long, newAccountId: Long) {
+        transactionDao.moveTransactionsToAccount(oldAccountId, newAccountId)
+    }
+
     suspend fun insertTransaction(transaction: Transaction) {
         // This now matches the @Insert method in your DAO
         transactionDao.insertTransaction(transaction)

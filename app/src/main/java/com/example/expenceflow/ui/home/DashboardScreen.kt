@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 import com.example.expenceflow.utils.exportTransactionsToExcel
+import com.example.expenceflow.utils.exportTransactionsToCsv
 import com.example.expenceflow.ui.theme.AppThemeState
 import androidx.compose.ui.graphics.SolidColor
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,23 +44,25 @@ fun DashboardScreen(
     viewModel: TransactionViewModel,
     budgetViewModel: BudgetViewModel = hiltViewModel(),
     onViewAllClick: () -> Unit,
-    onExportExcel: () -> Unit
+    onPendingClick: () -> Unit = {}
 ) {
     val transactions by viewModel.allTransactions.collectAsState()
-    val selectedAccount by viewModel.selectedAccount.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
+    val currentAccountId by viewModel.currentAccountId.collectAsState()
+    val pendingTransactions by viewModel.pendingTransactions.collectAsState()
+    
     val monthlyGoal by budgetViewModel.monthlyGoal.collectAsState()
     val context = LocalContext.current
-
-    val accounts = listOf("All", "Cash", "UPI", "Bank")
     
-    val accountFilteredTransactions = if (selectedAccount == "All") transactions 
-                                     else transactions.filter { it.account == selectedAccount }
+    // ...
+    
+    // ...
 
-    val income = accountFilteredTransactions.filter { it.type.equals("Income", true) }.sumOf { it.amount }.toFloat()
-    val expense = accountFilteredTransactions.filter { it.type.equals("Expense", true) }.sumOf { it.amount }.toFloat()
+    val income = transactions.filter { it.type.equals("Income", true) }.sumOf { it.amount }.toFloat()
+    val expense = transactions.filter { it.type.equals("Expense", true) }.sumOf { it.amount }.toFloat()
     val balance = income - expense
 
-    val categorySpending = accountFilteredTransactions
+    val categorySpending = transactions
         .filter { it.type.equals("Expense", true) }
         .groupBy { it.category.split(" • ").first() }
         .mapValues { it.value.sumOf { tx -> tx.amount }.toFloat() }
@@ -82,12 +85,15 @@ fun DashboardScreen(
                 DashboardTopBarModern(
                     onExportExcel = {
                         exportTransactionsToExcel(context = context, transactions = transactions)
+                    },
+                    onExportCsv = {
+                        exportTransactionsToCsv(context = context, transactions = transactions)
                     }
                 )
                 AccountSelector(
                     accounts = accounts,
-                    selectedAccount = selectedAccount,
-                    onAccountSelected = { viewModel.selectAccount(it) }
+                    currentAccountId = currentAccountId,
+                    onAccountSelected = { viewModel.selectAccountId(it) }
                 )
             }
         },
@@ -102,10 +108,19 @@ fun DashboardScreen(
         ) {
             Spacer(Modifier.height(16.dp))
 
+            if (pendingTransactions.isNotEmpty()) {
+                PendingIndicator(
+                    count = pendingTransactions.size,
+                    onClick = onPendingClick
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+
             ModernBalanceCard(
                 balance = balance,
                 income = income,
                 expense = expense,
+                monthlyGoal = monthlyGoal?.amount?.toFloat() ?: 0f,
                 onSetBudgetClick = { showBudgetDialog = true }
             )
 
@@ -127,10 +142,19 @@ fun DashboardScreen(
                     Text("See all", style = MaterialTheme.typography.labelLarge)
                 }
             }
-            
-            transactions.take(3).forEach {
-                ModernTransactionItem(it)
-                Spacer(Modifier.height(8.dp))
+
+            if (transactions.isEmpty()) {
+                Text(
+                    "No transactions yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else {
+                transactions.take(5).forEach {
+                    ModernTransactionItem(it)
+                    Spacer(Modifier.height(8.dp))
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -157,51 +181,95 @@ fun DashboardScreen(
 }
 
 @Composable
-fun DashboardTopBarModern(onExportExcel: () -> Unit) {
+fun PendingIndicator(count: Int, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = "$count transactions need attention",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+    }
+}
+
+@Composable
+fun DashboardTopBarModern(
+    onExportExcel: () -> Unit,
+    onExportCsv: () -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.8f),
+        tonalElevation = 0.dp
     ) {
-        Column {
-            Text(
-                "ExpenseFlow",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                "Track your Money",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Box {
-            FilledIconButton(
-                onClick = { expanded = true },
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "ExpenseFlow",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-1).sp,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            ) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                Text(
+                    "Intelligent Money Tracking",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Export Transactions") },
-                    leadingIcon = { Icon(Icons.Default.FileDownload, null) },
-                    onClick = {
-                        expanded = false
-                        onExportExcel()
-                    }
-                )
+            Box {
+                FilledTonalIconButton(
+                    onClick = { expanded = true },
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                }
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Export CSV") },
+                        leadingIcon = { Icon(Icons.Default.FileDownload, null) },
+                        onClick = {
+                            expanded = false
+                            onExportCsv()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Export Excel (.xlsx)") },
+                        leadingIcon = { Icon(Icons.Default.TableChart, null) },
+                        onClick = {
+                            expanded = false
+                            onExportExcel()
+                        }
+                    )
+                }
             }
         }
     }
@@ -209,33 +277,58 @@ fun DashboardTopBarModern(onExportExcel: () -> Unit) {
 
 @Composable
 fun AccountSelector(
-    accounts: List<String>,
-    selectedAccount: String,
-    onAccountSelected: (String) -> Unit
+    accounts: List<com.example.expenceflow.data.db.Account>,
+    currentAccountId: Long?,
+    onAccountSelected: (Long?) -> Unit
 ) {
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(end = 16.dp)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
-        items(accounts) { account ->
-            val isSelected = selectedAccount == account
+        item {
+            val isSelected = currentAccountId == null
             Surface(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onAccountSelected(account) },
+                    .width(100.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onAccountSelected(null) },
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Text(
-                    text = account,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                )
+                Box(modifier = Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "All",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        items(accounts) { account ->
+            val isSelected = currentAccountId == account.id
+            Surface(
+                modifier = Modifier
+                    .width(140.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onAccountSelected(account.id) },
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = account.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    // Balance display for account could be added here if we had the account balances
+                }
             }
         }
     }
@@ -246,12 +339,13 @@ fun ModernBalanceCard(
     balance: Float,
     income: Float,
     expense: Float,
+    monthlyGoal: Float,
     onSetBudgetClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .height(210.dp),
         shape = RoundedCornerShape(32.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primary
@@ -282,6 +376,34 @@ fun ModernBalanceCard(
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
+                        
+                        // New Velocity Badge
+                        val dailyBudget = if (monthlyGoal > 0) (monthlyGoal / 30) else 0f
+                        val isOverSpeed = (expense / 30) > dailyBudget && dailyBudget > 0
+                        
+                        Surface(
+                            color = if (isOverSpeed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isOverSpeed) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = if (isOverSpeed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = if (isOverSpeed) "Spending Fast" else "Healthy Pace",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isOverSpeed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                     }
                     Icon(
                         Icons.Default.AccountBalanceWallet,
@@ -381,6 +503,7 @@ fun ModernSpendingProgress(spent: Float, totalBudget: Float) {
 @Composable
 fun ModernTransactionItem(tx: Transaction) {
     val date = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(tx.date))
+    val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(tx.date))
     val isExpense = tx.type.equals("Expense", true)
 
     Card(
@@ -390,7 +513,7 @@ fun ModernTransactionItem(tx: Transaction) {
             containerColor = MaterialTheme.colorScheme.surface
         ),
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
+            0.5.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
         )
     ) {
@@ -410,8 +533,20 @@ fun ModernTransactionItem(tx: Transaction) {
                     ),
                 contentAlignment = Alignment.Center
             ) {
+                val icon = when (tx.category.lowercase()) {
+                    "food" -> Icons.Default.Restaurant
+                    "transport" -> Icons.Default.DirectionsCar
+                    "shopping" -> Icons.Default.ShoppingBag
+                    "bills" -> Icons.Default.Receipt
+                    "entertainment" -> Icons.Default.Movie
+                    "health" -> Icons.Default.MedicalServices
+                    "salary" -> Icons.Default.Payments
+                    "gift" -> Icons.Default.CardGiftcard
+                    "education" -> Icons.Default.School
+                    else -> if (isExpense) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward
+                }
                 Icon(
-                    imageVector = if (isExpense) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
@@ -427,11 +562,42 @@ fun ModernTransactionItem(tx: Transaction) {
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
-                Text(
-                    "$date • ${tx.category}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "$date • $time",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when(tx.account.lowercase()) {
+                                    "cash" -> Icons.Default.Payments
+                                    "upi" -> Icons.Default.QrCode
+                                    "bank" -> Icons.Default.AccountBalance
+                                    else -> Icons.Default.Wallet
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = tx.account.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
             }
             
             Text(
@@ -479,12 +645,15 @@ fun ModernTopCategories(categorySpending: List<Pair<String, Float>>) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val icon = when (category.lowercase()) {
-                        "food" -> Icons.Default.Fastfood
-                        "home" -> Icons.Default.Home
-                        "travel", "flight" -> Icons.Default.DirectionsCar
-                        "fun", "entertainment" -> Icons.Default.Movie
+                        "food" -> Icons.Default.Restaurant
+                        "transport" -> Icons.Default.DirectionsCar
                         "shopping" -> Icons.Default.ShoppingBag
+                        "bills" -> Icons.Default.Receipt
+                        "entertainment" -> Icons.Default.Movie
                         "health" -> Icons.Default.MedicalServices
+                        "salary" -> Icons.Default.Payments
+                        "gift" -> Icons.Default.CardGiftcard
+                        "education" -> Icons.Default.School
                         else -> Icons.Default.Category
                     }
                     

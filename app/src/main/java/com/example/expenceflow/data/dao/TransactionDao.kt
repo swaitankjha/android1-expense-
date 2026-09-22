@@ -15,8 +15,18 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction)
 
-    @Query("SELECT * FROM transactions ORDER BY date DESC")
+    @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY date DESC, id DESC")
+    fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE accountId = :accountId")
+    suspend fun getTransactionCountForAccount(accountId: Long): Int
+
+    @Query("UPDATE transactions SET accountId = :newAccountId WHERE accountId = :oldAccountId")
+    suspend fun moveTransactionsToAccount(oldAccountId: Long, newAccountId: Long)
+
     @Query(
         "SELECT EXISTS(" +
                 "SELECT 1 FROM transactions " +

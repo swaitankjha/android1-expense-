@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.expenceflow.ui.notification.NotificationListenerHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +30,10 @@ fun SettingScreen(
     val isDarkModeEnabled by settingsViewModel.isDarkModeEnabled.collectAsState()
     val isNotificationEnabled by settingsViewModel.isNotificationEnabled.collectAsState()
     val context = LocalContext.current
+
+    var isNotificationAccessGranted by remember {
+        mutableStateOf(NotificationListenerHelper.isNotificationListenerEnabled(context))
+    }
 
     Scaffold(
         topBar = {
@@ -66,12 +71,42 @@ fun SettingScreen(
                         onCheckedChange = { settingsViewModel.toggleNotifications(context) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    ModernSettingsRow(
+                        icon = Icons.Default.NotificationsActive,
+                        title = "Payment Notification Access",
+                        subtitle = if (isNotificationAccessGranted) "Enabled (GPay, PhonePe, Paytm & Bank alerts)" else "Tap to grant permission in Settings",
+                        onClick = {
+                            NotificationListenerHelper.openNotificationListenerSettings(context)
+                            isNotificationAccessGranted = NotificationListenerHelper.isNotificationListenerEnabled(context)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ModernSettingsToggle(
                         icon = Icons.Default.DarkMode,
                         title = "Dark Mode",
                         subtitle = "Easier on your eyes",
                         checked = isDarkModeEnabled,
                         onCheckedChange = { settingsViewModel.toggleDarkMode(context) }
+                    )
+                }
+            }
+
+            item {
+                Text(
+                    "Accounts",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+            }
+
+            item {
+                ModernSettingsCard {
+                    ModernSettingsRow(
+                        icon = Icons.Default.AccountBalanceWallet,
+                        title = "Manage Accounts",
+                        subtitle = "Add, edit or archive money spaces",
+                        onClick = { navController.navigate("settings/accounts") }
                     )
                 }
             }

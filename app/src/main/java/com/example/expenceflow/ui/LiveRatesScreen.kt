@@ -24,10 +24,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.animation.Crossfade
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.SolidColor
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveRatesScreen(
-    viewModel: LiveRatesViewModel = viewModel()
+    viewModel: LiveRatesViewModel
 ) {
     val marketState by viewModel.marketState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -67,106 +72,180 @@ fun LiveRatesScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            when (val state = marketState) {
-                is MarketUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+            Crossfade(targetState = marketState, label = "marketState") { state ->
+                when (state) {
+                    is MarketUiState.Loading -> {
+                        MarketSkeletonLoader()
                     }
-                }
-                is MarketUiState.Error -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Unable to fetch latest rates", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.height(16.dp))
-                        Button(onClick = { viewModel.refreshRates(force = true) }) {
-                            Text("Try Again")
-                        }
+                    is MarketUiState.Error -> {
+                        MarketErrorView(
+                            message = state.message,
+                            onRetry = { viewModel.refreshRates(force = true) }
+                        )
                     }
-                }
-                is MarketUiState.Success -> {
-                    val market = state.data
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        item {
-                            MarketHeaderCard(market)
-                        }
-                        item {
-                            SectionTitle("Precious Metals")
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                MarketTileModern(
-                                    title = "Gold 24K",
-                                    value = "₹%,.0f".format(market.gold.gold24),
-                                    unit = "/g",
-                                    icon = Icons.Default.CurrencyRupee,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                MarketTileModern(
-                                    title = "Gold 22K",
-                                    value = "₹%,.0f".format(market.gold.gold22),
-                                    unit = "/g",
-                                    icon = Icons.Default.CurrencyRupee,
-                                    modifier = Modifier.weight(1f)
+                    is MarketUiState.Success -> {
+                        val market = state.data
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            item {
+                                MarketHeaderCard(market)
+                            }
+                            item {
+                                SectionTitle("Precious Metals")
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    MarketTileModern(
+                                        title = "Gold 24K",
+                                        value = "₹%,.0f".format(market.gold.gold24),
+                                        unit = "/g",
+                                        icon = Icons.Default.CurrencyRupee,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    MarketTileModern(
+                                        title = "Gold 22K",
+                                        value = "₹%,.0f".format(market.gold.gold22),
+                                        unit = "/g",
+                                        icon = Icons.Default.CurrencyRupee,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    MarketTileModern(
+                                        title = "Silver",
+                                        value = "₹%,.2f".format(market.silver.gram),
+                                        unit = "/g",
+                                        icon = Icons.Default.CurrencyRupee,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    MarketTileModern(
+                                        title = "Silver",
+                                        value = "₹%,.0f".format(market.silver.kg),
+                                        unit = "/kg",
+                                        icon = Icons.Default.CurrencyRupee,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            item {
+                                SectionTitle("Fuel Prices")
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    MarketTileModern(
+                                        title = "Petrol",
+                                        value = "₹%,.2f".format(market.fuel.petrol),
+                                        unit = "/L",
+                                        icon = Icons.Default.LocalGasStation,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    MarketTileModern(
+                                        title = "Diesel",
+                                        value = "₹%,.2f".format(market.fuel.diesel),
+                                        unit = "/L",
+                                        icon = Icons.Default.LocalGasStation,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            item {
+                                Text(
+                                    text = "Last updated: ${market.updatedAt}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                MarketTileModern(
-                                    title = "Silver",
-                                    value = "₹%,.2f".format(market.silver.gram),
-                                    unit = "/g",
-                                    icon = Icons.Default.CurrencyRupee,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                MarketTileModern(
-                                    title = "Silver",
-                                    value = "₹%,.0f".format(market.silver.kg),
-                                    unit = "/kg",
-                                    icon = Icons.Default.CurrencyRupee,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        item {
-                            SectionTitle("Fuel Prices")
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                MarketTileModern(
-                                    title = "Petrol",
-                                    value = "₹%,.2f".format(market.fuel.petrol),
-                                    unit = "/L",
-                                    icon = Icons.Default.LocalGasStation,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                MarketTileModern(
-                                    title = "Diesel",
-                                    value = "₹%,.2f".format(market.fuel.diesel),
-                                    unit = "/L",
-                                    icon = Icons.Default.LocalGasStation,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        item {
-                            Text(
-                                text = "Last updated: ${market.updatedAt}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun MarketSkeletonLoader() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header card skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+        )
+        
+        // Title skeleton
+        Box(
+            modifier = Modifier
+                .width(150.dp)
+                .height(24.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+        )
+
+        // Tiles skeletons
+        repeat(2) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(2) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(110.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MarketErrorView(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Connection Error",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onRetry,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Try Again")
         }
     }
 }

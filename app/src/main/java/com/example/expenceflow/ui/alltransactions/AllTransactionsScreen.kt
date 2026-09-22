@@ -1,7 +1,9 @@
 package com.example.expenceflow.ui.alltransactions
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +27,9 @@ import com.example.expenceflow.utils.exportTransactionsToExcel
 import com.example.expenceflow.ui.theme.*
 import com.example.expenceflow.ui.EditTransactionDialog
 
+import java.text.SimpleDateFormat
+import java.util.*
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllTransactionsScreen(
@@ -36,40 +41,100 @@ fun AllTransactionsScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("All") }
+    var selectedAccountFilter by remember { mutableStateOf("All") }
     var sortByNewest by remember { mutableStateOf(true) }
 
     var editTx by remember { mutableStateOf<Transaction?>(null) }
     var deleteTx by remember { mutableStateOf<Transaction?>(null) }
 
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    val isSelectionMode = selectedIds.isNotEmpty()
+
     val filteredTransactions = transactions
         .filter {
             val matchesSearch = it.title.contains(searchQuery, ignoreCase = true) || 
-                                it.category.contains(searchQuery, ignoreCase = true)
+                                it.category.contains(searchQuery, ignoreCase = true) ||
+                                it.account.contains(searchQuery, ignoreCase = true) ||
+                                it.amount.toString().contains(searchQuery)
             val matchesType = when (selectedType) {
                 "Income" -> it.type.equals("Income", true)
                 "Expense" -> it.type.equals("Expense", true)
                 else -> true
             }
-            matchesSearch && matchesType
+            val matchesAccount = if (selectedAccountFilter == "All") true else it.account == selectedAccountFilter
+            matchesSearch && matchesType && matchesAccount
         }
         .sortedBy { if (sortByNewest) -it.date else it.date }
 
+    val selectedTotal = filteredTransactions.filter { it.id in selectedIds }
+        .sumOf { if (it.type.equals("Expense", true)) -it.amount else it.amount }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("All Transactions", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+            if (isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedIds.size} Selected", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedIds = emptySet() }) {
+                            Icon(Icons.Default.Close, null)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { 
+                            selectedIds = filteredTransactions.map { it.id }.toSet() 
+                        }) {
+                            Icon(Icons.Default.SelectAll, "Select All")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("All Transactions", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, null)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { exportTransactionsToExcel(context, filteredTransactions) }) {
+                            Icon(Icons.Default.FileDownload, null)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                )
+            }
+        },
+        bottomBar = {
+            if (isSelectionMode) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tonalElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).padding(bottom = 32.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Total Amount", style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                text = "₹%,.0f".format(selectedTotal),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Black,
+                                color = if (selectedTotal >= 0) SuccessGreen else ErrorRed
+                            )
+                        }
+                        Button(onClick = { selectedIds = emptySet() }) {
+                            Text("Clear")
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { exportTransactionsToExcel(context, filteredTransactions) }) {
-                        Icon(Icons.Default.FileDownload, null)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+                }
+            }
         }
     ) { padding ->
         Column(
@@ -78,6 +143,7 @@ fun AllTransactionsScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
+            // ... (rest of the code)
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
@@ -101,25 +167,47 @@ fun AllTransactionsScreen(
             )
 
             // Filters
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf("All", "Income", "Expense").forEach { type ->
-                    FilterChip(
-                        selected = selectedType == type,
-                        onClick = { selectedType = type },
-                        label = { Text(type) }
-                    )
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                // Type Filter
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("All", "Income", "Expense").forEach { type ->
+                        FilterChip(
+                            selected = selectedType == type,
+                            onClick = { selectedType = type },
+                            label = { Text(type) }
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { sortByNewest = !sortByNewest }) {
+                        Icon(
+                            imageVector = if (sortByNewest) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
+                            contentDescription = "Sort",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { sortByNewest = !sortByNewest }) {
-                    Icon(
-                        imageVector = if (sortByNewest) Icons.Default.VerticalAlignBottom else Icons.Default.VerticalAlignTop,
-                        contentDescription = "Sort",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                
+                // Account Filter (Secondary Filter Row)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("All", "Cash", "UPI", "Bank").forEach { acc ->
+                        FilterChip(
+                            selected = selectedAccountFilter == acc,
+                            onClick = { selectedAccountFilter = acc },
+                            label = { Text(acc) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        )
+                    }
                 }
             }
 
@@ -129,16 +217,60 @@ fun AllTransactionsScreen(
                     Text("No transactions found", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
+                val groupedTransactions = filteredTransactions.groupBy { 
+                    val calendar = Calendar.getInstance()
+                    calendar.timeInMillis = it.date
+                    val today = Calendar.getInstance()
+                    val yesterday = Calendar.getInstance()
+                    yesterday.add(Calendar.DAY_OF_YEAR, -1)
+
+                    when {
+                        isSameDay(calendar, today) -> "Today"
+                        isSameDay(calendar, yesterday) -> "Yesterday"
+                        else -> SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it.date))
+                    }
+                }
+
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    items(filteredTransactions, key = { it.id }) { tx ->
-                        ModernTransactionCard(
-                            tx = tx,
-                            onEdit = { editTx = tx },
-                            onDelete = { deleteTx = tx }
-                        )
+                    groupedTransactions.forEach { (dateHeader, transactionsForDate) ->
+                        item {
+                            Surface(
+                                color = MaterialTheme.colorScheme.background,
+                                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)
+                            ) {
+                                Text(
+                                    text = dateHeader.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                            }
+                        }
+                        items(transactionsForDate, key = { it.id }) { tx ->
+                            val isSelected = tx.id in selectedIds
+                            ModernTransactionCard(
+                                tx = tx,
+                                isSelected = isSelected,
+                                onLongClick = {
+                                    selectedIds = if (isSelected) selectedIds - tx.id else selectedIds + tx.id
+                                },
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        selectedIds = if (isSelected) selectedIds - tx.id else selectedIds + tx.id
+                                    } else {
+                                        editTx = tx
+                                    }
+                                },
+                                onEdit = { editTx = tx },
+                                onDelete = { deleteTx = tx }
+                            )
+                        }
                     }
                 }
             }
@@ -176,27 +308,69 @@ fun AllTransactionsScreen(
     }
 }
 
+private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ModernTransactionCard(tx: Transaction, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun ModernTransactionCard(
+    tx: Transaction,
+    isSelected: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onEdit: () -> Unit, 
+    onDelete: () -> Unit
+) {
     val isExpense = tx.type.equals("Expense", true)
+    val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(tx.date))
+
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            if (isSelected) 2.dp else 0.5.dp, 
+            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(44.dp).clip(CircleShape).background(
-                    if (isExpense) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                    else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                ),
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isExpense) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
+                val icon = when (tx.category.lowercase()) {
+                    "food" -> Icons.Default.Restaurant
+                    "transport" -> Icons.Default.DirectionsCar
+                    "shopping" -> Icons.Default.ShoppingBag
+                    "bills" -> Icons.Default.Receipt
+                    "entertainment" -> Icons.Default.Movie
+                    "health" -> Icons.Default.MedicalServices
+                    "salary" -> Icons.Default.Payments
+                    "gift" -> Icons.Default.CardGiftcard
+                    "education" -> Icons.Default.School
+                    else -> if (isExpense) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward
+                }
                 Icon(
-                    imageVector = if (isExpense) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
@@ -205,7 +379,48 @@ fun ModernTransactionCard(tx: Transaction, onEdit: () -> Unit, onDelete: () -> U
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(tx.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text(tx.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tx.category, 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        time,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when(tx.account.lowercase()) {
+                                    "cash" -> Icons.Default.Payments
+                                    "upi" -> Icons.Default.QrCode
+                                    "bank" -> Icons.Default.AccountBalance
+                                    else -> Icons.Default.Wallet
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = tx.account.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(

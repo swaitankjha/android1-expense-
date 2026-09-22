@@ -12,5 +12,6 @@ data class Transaction(
     val date: Long,
     val type: String, // e.g., "Income", "Expense"
     val category: String, // e.g., "Food", "Salary"
-    val account: String = "Cash" // Added account field for multiple account support
+    val account: String = "Cash", // Added account field for multiple account support
+    val accountId: Long = 1 // New field linking to Account entity
 )

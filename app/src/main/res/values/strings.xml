@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Expense flow</string>
+    <string name="add_transaction_label">Add Transaction</string>
 </resources>

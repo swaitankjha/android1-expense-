@@ -23,9 +23,6 @@ fun AppNavGraph(viewModel: TransactionViewModel) {
                 viewModel = viewModel,
                 onViewAllClick = {
                     navController.navigate(Routes.ALL_TRANSACTIONS)
-                },
-                onExportExcel = {
-                    // TODO: Excel export logic
                 }
             )
         }

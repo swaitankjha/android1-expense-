@@ -9,6 +9,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import android.util.Log
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+
 /* ---------------- MODELS ---------------- */
 
 data class MarketResponse(
@@ -60,7 +63,8 @@ sealed class MarketUiState {
 
 /* ---------------- VIEWMODEL ---------------- */
 
-class LiveRatesViewModel : ViewModel() {
+@HiltViewModel
+class LiveRatesViewModel @Inject constructor() : ViewModel() {
 
     private val _marketState =
         MutableStateFlow<MarketUiState>(
@@ -98,51 +102,30 @@ class LiveRatesViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 _isRefreshing.value = true
-                // If it's a manual refresh (force), we might want to keep the old data visible
-                if (force) {
-                    // Stay in success but show loading indicator via _isRefreshing
-                } else {
+                
+                // Only show loading if we don't already have data
+                if (_marketState.value !is MarketUiState.Success) {
                     _marketState.value = MarketUiState.Loading
                 }
 
-                val response =
-                    api.getMarketData()
+                val response = api.getMarketData()
 
-                Log.d(
-                    "MARKET_API",
-                    response.toString()
-                )
+                Log.d("MARKET_API", response.toString())
 
                 if (response.success) {
-
-                    _marketState.value =
-                        MarketUiState.Success(
-                            response
-                        )
-
+                    _marketState.value = MarketUiState.Success(response)
                 } else {
-
-                    _marketState.value =
-                        MarketUiState.Error(
-                            "API returned success=false"
-                        )
+                    if (_marketState.value !is MarketUiState.Success) {
+                        _marketState.value = MarketUiState.Error("API returned success=false")
+                    }
                 }
 
             } catch (e: Exception) {
-
-                Log.e(
-                    "MARKET_API",
-                    "Request Failed",
-                    e
-                )
-
-                _marketState.value =
-                    MarketUiState.Error(
-                        e.localizedMessage ?: "Unknown Error"
-                    )
-
+                Log.e("MARKET_API", "Request Failed", e)
+                if (_marketState.value !is MarketUiState.Success) {
+                    _marketState.value = MarketUiState.Error(e.localizedMessage ?: "Unknown Error")
+                }
             } finally {
-
                 _isRefreshing.value = false
             }
         }

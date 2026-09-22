@@ -20,11 +20,12 @@ import com.example.expenceflow.ui.home.DashboardScreen
 import com.example.expenceflow.ui.setting.SettingScreen
 import com.example.expenceflow.ui.TransactionScreen
 import com.example.expenceflow.ui.transaction.TransactionViewModel
+import com.example.expenceflow.ui.LiveRatesViewModel
 
 @Composable
 fun MainScreen() {
 
-    // ✅ single ViewModel instance
+
     val transactionViewModel: TransactionViewModel = hiltViewModel()
     val settingsViewModel = hiltViewModel<com.example.expenceflow.ui.setting.SettingsViewModel>()
 
@@ -51,7 +52,7 @@ fun MainScreen() {
                         selected = selectedScreen == screen,
                         onClick = {
                             selectedScreen = screen
-                            showAllTransactions = false // 👈 reset
+                            showAllTransactions = false
                         }
                     )
                 }
@@ -75,10 +76,7 @@ fun MainScreen() {
                             viewModel = transactionViewModel,
                             onViewAllClick = {
                                 showAllTransactions = true
-                            },
-                            onExportExcel = {
-                                // TODO: Excel export logic
-                            }
+                              }
                         )
                     }
 
@@ -91,9 +89,8 @@ fun MainScreen() {
                     }
 
                     BottomNavScreen.LiveRates -> {
-                        LiveRatesScreen()
+                        LiveRatesScreen(viewModel = hiltViewModel())
                     }
-
                     BottomNavScreen.Setting -> {
                         SettingScreen(
                             settingsViewModel = settingsViewModel,
