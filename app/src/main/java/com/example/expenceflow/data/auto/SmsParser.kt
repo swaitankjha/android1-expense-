@@ -11,27 +11,35 @@ class SmsParser @Inject constructor() {
 
     private val transactionKeywords = listOf(
         "debited", "credited", "spent", "paid", "sent", "received", "added",
-        "txn", "transaction", "transfer", "trf", "withdrawn", "deposited", "refund", "purchase"
+        "txn", "transaction", "transfer", "trf", "withdrawn", "deposited", "refund", "purchase", "payment"
     )
 
     private val incomeKeywords = listOf(
         "credited", "received", "added", "deposited", "refund", "cashback", "salary", "recd"
     )
 
-    private val amountPattern = Pattern.compile(
+    // Pattern 1: Currency before amount (e.g. Rs. 500, Rs 500.00, INR 1,250.50, ₹450, Amt 1000)
+    private val currencyBeforeAmountPattern = Pattern.compile(
         "(?i)(?:Rs|INR|\\u20B9|Amt|Amount|USD|\\$)\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)",
         Pattern.CASE_INSENSITIVE
     )
 
-    private val fallbackAmountPattern = Pattern.compile(
-        "(?i)(?:debited|credited|spent|paid|received|sent|withdrawn)\\s+(?:by|for|with|of)?\\s*(?:Rs|INR|\\u20B9|Amt)?\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)",
+    // Pattern 2: Amount before currency (e.g. 500.00 Rs, 1250 INR, 450 ₹)
+    private val amountBeforeCurrencyPattern = Pattern.compile(
+        "(?i)([\\d,]+(?:\\.\\d{1,2})?)\\s*(?:Rs|INR|\\u20B9|USD|\\$)",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    // Pattern 3: Financial verb/noun before amount (e.g. debited by 500.00, txn of 250, payment of 100)
+    private val verbBeforeAmountPattern = Pattern.compile(
+        "(?i)(?:debited|credited|spent|paid|received|sent|withdrawn|txn|transaction|transfer|trf|payment|purchase)\\s+(?:by|for|with|of|is)?\\s*(?:Rs|INR|\\u20B9|Amt)?\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)",
         Pattern.CASE_INSENSITIVE
     )
 
     private val merchantPrefixes = listOf(
-        "(?i)(?:by transfer from|transfer from|from)\\s+([A-Za-z0-9\\s&.'@_-]{2,30})",
-        "(?i)(?:at|trf to|towards|in favour of|vpa)\\s+([A-Za-z0-9\\s&.'@_-]{2,30})",
-        "(?i)(?:to)\\s+([A-Za-z0-9\\s&.'@_-]{2,30})"
+        "(?i)(?:by transfer from|transfer from|from)\\s+([A-Za-z0-9\\s&.'@_/-]{2,35})",
+        "(?i)(?:at|trf to|towards|in favour of|vpa|info:|info|merchant:|vendor:|store:)\\s+([A-Za-z0-9\\s&.'@_/-]{2,35})",
+        "(?i)(?:spent on|paid to|sent to|paid at|to|on|for)\\s+([A-Za-z0-9\\s&.'@_/-]{2,35})"
     )
 
     fun parse(smsBody: String, sender: String = "", timestamp: Long = System.currentTimeMillis()): TransactionCandidate? {
@@ -57,16 +65,28 @@ class SmsParser @Inject constructor() {
         }
 
         var amount: Double? = null
-        val amountMatcher = amountPattern.matcher(smsBody)
-        if (amountMatcher.find()) {
-            val amountStr = amountMatcher.group(1)?.replace(",", "")
+
+        // Try Pattern 1 (Currency before amount)
+        val matcher1 = currencyBeforeAmountPattern.matcher(smsBody)
+        if (matcher1.find()) {
+            val amountStr = matcher1.group(1)?.replace(",", "")
             amount = amountStr?.toDoubleOrNull()
         }
 
+        // Try Pattern 2 (Amount before currency)
         if (amount == null) {
-            val fallbackMatcher = fallbackAmountPattern.matcher(smsBody)
-            if (fallbackMatcher.find()) {
-                val amountStr = fallbackMatcher.group(1)?.replace(",", "")
+            val matcher2 = amountBeforeCurrencyPattern.matcher(smsBody)
+            if (matcher2.find()) {
+                val amountStr = matcher2.group(1)?.replace(",", "")
+                amount = amountStr?.toDoubleOrNull()
+            }
+        }
+
+        // Try Pattern 3 (Verb before amount)
+        if (amount == null) {
+            val matcher3 = verbBeforeAmountPattern.matcher(smsBody)
+            if (matcher3.find()) {
+                val amountStr = matcher3.group(1)?.replace(",", "")
                 amount = amountStr?.toDoubleOrNull()
             }
         }
@@ -113,13 +133,29 @@ class SmsParser @Inject constructor() {
     }
 
     private fun cleanMerchantName(raw: String): String {
+        var processed = raw
+
+        // Handle raw UPI patterns like UPI/30123456/Zomato or INF*Zomato*123
+        if (processed.contains("/") || processed.contains("*")) {
+            val segments = processed.split(Regex("[/*]"))
+            val bestSegment = segments.firstOrNull { seg ->
+                val cleanSeg = seg.trim().lowercase()
+                cleanSeg.length >= 3 &&
+                !cleanSeg.matches(Regex("\\d+")) &&
+                !listOf("upi", "inf", "vpa", "payment", "txn", "ref", "p2m", "p2p").contains(cleanSeg)
+            }
+            if (bestSegment != null) {
+                processed = bestSegment.trim()
+            }
+        }
+
         val stopWords = listOf(
             "on", "ref", "ref no", "bal", "avail", "balance", "card",
             "using", "via", "upi", "dated", "val", "lim", "is", "dt", "ref:"
         )
         val skipPrefixes = listOf("your", "my", "a/c", "ac", "account", "vpa")
 
-        val parts = raw.split(Regex("\\s+"))
+        val parts = processed.split(Regex("\\s+"))
         val resultParts = mutableListOf<String>()
 
         for (part in parts) {

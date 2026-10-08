@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.expenceflow.ui.notification.NotificationListenerHelper
+import com.example.expenceflow.utils.BatteryOptimizationHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +34,10 @@ fun SettingScreen(
 
     var isNotificationAccessGranted by remember {
         mutableStateOf(NotificationListenerHelper.isNotificationListenerEnabled(context))
+    }
+
+    var isIgnoringBatteryOptimizations by remember {
+        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
     }
 
     Scaffold(
@@ -78,6 +83,16 @@ fun SettingScreen(
                         onClick = {
                             NotificationListenerHelper.openNotificationListenerSettings(context)
                             isNotificationAccessGranted = NotificationListenerHelper.isNotificationListenerEnabled(context)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    ModernSettingsRow(
+                        icon = Icons.Default.BatteryAlert,
+                        title = "Background Battery Restrictions",
+                        subtitle = if (isIgnoringBatteryOptimizations) "Unrestricted (Background SMS detection active)" else "Tap to set Unrestricted so SMS messages are never missed",
+                        onClick = {
+                            BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(context)
+                            isIgnoringBatteryOptimizations = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
                         }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

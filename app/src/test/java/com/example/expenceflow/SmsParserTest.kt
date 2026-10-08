@@ -58,6 +58,36 @@ class SmsParserTest {
     }
 
     @Test
+    fun testUpiRawSegmentSms() {
+        val sms = "A/c XX1234 debited for Rs 120.00 on 12-01-25. Info: UPI/30123456/Zomato/PAYMENT. Ref 123."
+        val candidate = smsParser.parse(sms, "VM-BANK")
+        assertNotNull(candidate)
+        assertEquals(120.0, candidate!!.amount, 0.01)
+        assertEquals("Expense", candidate.type)
+        assertEquals("Zomato", candidate.merchant)
+    }
+
+    @Test
+    fun testTxnWithoutCurrencySymbolSms() {
+        val sms = "Txn of 500.00 made at Amazon on 15-Jan-25."
+        val candidate = smsParser.parse(sms, "VM-BANK")
+        assertNotNull(candidate)
+        assertEquals(500.0, candidate!!.amount, 0.01)
+        assertEquals("Expense", candidate.type)
+        assertEquals("Amazon", candidate.merchant)
+    }
+
+    @Test
+    fun testSpentOnCreditCardSms() {
+        val sms = "Spent Rs. 450.00 on Credit Card at Flipkart on 15-Jan-25."
+        val candidate = smsParser.parse(sms, "VM-BANK")
+        assertNotNull(candidate)
+        assertEquals(450.0, candidate!!.amount, 0.01)
+        assertEquals("Expense", candidate.type)
+        assertEquals("Flipkart", candidate.merchant)
+    }
+
+    @Test
     fun testOtpSmsIgnored() {
         val sms = "Your OTP for net banking login is 482910. Do not share with anyone."
         val candidate = smsParser.parse(sms, "VM-SBI")

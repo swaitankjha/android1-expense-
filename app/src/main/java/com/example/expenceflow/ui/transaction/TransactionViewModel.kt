@@ -40,12 +40,13 @@ class TransactionViewModel @Inject constructor(
         }
     }
 
-    fun findMatchingPending(amount: Double, type: String): PendingTransaction? {
+    fun findMatchingPending(amount: Double, type: String, merchant: String = ""): PendingTransaction? {
         val currentPending = pendingTransactions.value
         return duplicateDetectionEngine.findMatchingPending(
             amount = amount,
             date = System.currentTimeMillis(),
             type = type,
+            merchant = merchant,
             pendingTransactions = currentPending
         )
     }

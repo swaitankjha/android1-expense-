@@ -18,7 +18,7 @@ class ExtractionEngine @Inject constructor(
 
     suspend fun processCandidate(candidate: TransactionCandidate): TransactionCandidate? {
         Log.d(TAG, "Processing candidate from ${candidate.source}: ${candidate.merchant} ₹${candidate.amount}")
-        // 1. Categorize if needed
+
         val finalCategory = if (candidate.category == "Other" || candidate.category.isEmpty()) {
             categorizationEngine.categorize(candidate.merchant)
         } else {
@@ -27,17 +27,20 @@ class ExtractionEngine @Inject constructor(
 
         val enrichedCandidate = candidate.copy(category = finalCategory)
 
-        // 2. Check for duplicates (Only for SMS and Notifications which are truly automatic)
         if (enrichedCandidate.source == "SMS" || enrichedCandidate.source == "Notification") {
             val existing = repository.getAllTransactions().first()
             if (duplicateDetectionEngine.isDuplicate(enrichedCandidate, existing)) {
                 Log.d(TAG, "Duplicate detected in main history for: ${enrichedCandidate.merchant} ₹${enrichedCandidate.amount}")
                 return null
             }
-            
+
             val pendingList = pendingTransactionDao.getPendingTransactions().first()
             val matchingPending = duplicateDetectionEngine.findMatchingPending(
-                enrichedCandidate.amount, enrichedCandidate.date, enrichedCandidate.type, pendingList
+                amount = enrichedCandidate.amount,
+                date = enrichedCandidate.date,
+                type = enrichedCandidate.type,
+                merchant = enrichedCandidate.merchant,
+                pendingTransactions = pendingList
             )
             if (matchingPending != null) {
                 Log.d(TAG, "Duplicate detected in pending list for: ${enrichedCandidate.merchant} ₹${enrichedCandidate.amount}")

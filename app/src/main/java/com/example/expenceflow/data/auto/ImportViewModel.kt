@@ -5,18 +5,24 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.expenceflow.data.dao.PendingTransactionDao
-import com.example.expenceflow.data.db.PendingTransaction
+import com.example.expenceflow.data.db.Account
+import com.example.expenceflow.data.db.Transaction
+import com.example.expenceflow.data.repository.AccountRepository
+import com.example.expenceflow.data.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ImportViewModel @Inject constructor(
     private val repository: ImportRepository,
-    private val pendingTransactionDao: PendingTransactionDao,
+    private val transactionRepository: TransactionRepository,
+    private val accountRepository: AccountRepository,
     private val smsInboxScanner: SmsInboxScanner
 ) : ViewModel() {
     private val TAG = "ImportViewModel"
@@ -26,6 +32,9 @@ class ImportViewModel @Inject constructor(
 
     private val _importSummary = MutableStateFlow<String?>(null)
     val importSummary = _importSummary.asStateFlow()
+
+    val accounts: StateFlow<List<Account>> = accountRepository.getAllAccounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun scanSmsInbox(context: Context) {
         viewModelScope.launch {
@@ -48,15 +57,23 @@ class ImportViewModel @Inject constructor(
         }
     }
 
-    fun importFile(context: Context, uri: Uri, type: String) {
+    fun createAccountAndGet(name: String, onCreated: (Account) -> Unit) {
         viewModelScope.launch {
-            Log.d(TAG, "Starting import: $uri (type: $type)")
+            val accountName = name.trim().ifBlank { "Custom Account" }
+            val newAccount = Account(name = accountName)
+            val id = accountRepository.insertAccount(newAccount)
+            onCreated(newAccount.copy(id = id))
+        }
+    }
+
+    fun importFileToAccount(context: Context, uri: Uri, type: String, account: Account) {
+        viewModelScope.launch {
+            Log.d(TAG, "Importing file $uri of type $type directly to account ${account.name}")
             _isImporting.value = true
             _importSummary.value = null
             try {
                 val inputStream = context.contentResolver.openInputStream(uri)
                 if (inputStream == null) {
-                    Log.e(TAG, "Could not open input stream for URI: $uri")
                     _importSummary.value = "Failed to open file."
                     return@launch
                 }
@@ -67,25 +84,26 @@ class ImportViewModel @Inject constructor(
                     else -> repository.importPdf(inputStream)
                 }
 
-                Log.d(TAG, "Imported ${candidates.size} candidates")
+                Log.d(TAG, "Extracted ${candidates.size} transactions from file")
 
                 if (candidates.isEmpty()) {
-                    _importSummary.value = "No transactions found in this file. Please check the format."
+                    _importSummary.value = "No transactions found in this file. Please check the file format."
                 } else {
                     var successCount = 0
                     candidates.forEach { candidate ->
-                        val pending = PendingTransaction(
+                        val transaction = Transaction(
+                            title = candidate.merchant,
                             amount = candidate.amount,
-                            merchant = candidate.merchant,
-                            category = candidate.category,
                             date = candidate.date,
                             type = candidate.type,
-                            source = candidate.source
+                            category = candidate.category,
+                            account = account.name,
+                            accountId = account.id
                         )
-                        val id = pendingTransactionDao.insertPendingTransaction(pending)
-                        if (id > 0) successCount++
+                        transactionRepository.insertTransaction(transaction)
+                        successCount++
                     }
-                    _importSummary.value = "Successfully imported $successCount transactions for review."
+                    _importSummary.value = "Successfully added $successCount transactions directly to '${account.name}'!"
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Import error: ${e.message}", e)

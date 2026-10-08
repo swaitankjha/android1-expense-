@@ -328,7 +328,7 @@ fun TransactionScreen(
                         onClick = {
                             val amt = amount.toDoubleOrNull()
                             if (description.isNotBlank() && amt != null && amt > 0) {
-                                val match = viewModel.findMatchingPending(amt, type)
+                                val match = viewModel.findMatchingPending(amt, type, description)
                                 if (match != null) {
                                     pendingMatchToConfirm = match
                                 } else {
