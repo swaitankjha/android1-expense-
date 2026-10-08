@@ -1,43 +1,45 @@
 package com.example.expenceflow.ui.home
-import com.example.expenceflow.ui.theme.*
 
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.expenceflow.data.db.Account
 import com.example.expenceflow.data.db.Transaction
+import com.example.expenceflow.data.model.ExpensePeriodFilter
+import com.example.expenceflow.data.model.ExpensePeriodFilterUtil
+import com.example.expenceflow.data.model.ExpensePeriodManager
+import com.example.expenceflow.ui.SetBudgetDialog
+import com.example.expenceflow.ui.graph.CustomDateRangeDialog
 import com.example.expenceflow.ui.transaction.TransactionViewModel
-import kotlinx.coroutines.delay
+import com.example.expenceflow.ui.viewmodel.BudgetViewModel
+import com.example.expenceflow.utils.exportTransactionsToCsv
+import com.example.expenceflow.utils.exportTransactionsToExcel
 import java.text.SimpleDateFormat
 import java.util.*
-import com.example.expenceflow.utils.exportTransactionsToExcel
-import com.example.expenceflow.utils.exportTransactionsToCsv
-import com.example.expenceflow.ui.theme.AppThemeState
-import androidx.compose.ui.graphics.SolidColor
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.expenceflow.ui.viewmodel.BudgetViewModel
-import com.example.expenceflow.ui.SetBudgetDialog
-/* -------------------------------------------------- */
-/* ---------------- DASHBOARD ----------------------- */
-/* -------------------------------------------------- */
 
 @Composable
 fun DashboardScreen(
@@ -46,17 +48,26 @@ fun DashboardScreen(
     onViewAllClick: () -> Unit,
     onPendingClick: () -> Unit = {}
 ) {
-    val transactions by viewModel.allTransactions.collectAsState()
+    val rawTransactions by viewModel.allTransactions.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
     val currentAccountId by viewModel.currentAccountId.collectAsState()
     val pendingTransactions by viewModel.pendingTransactions.collectAsState()
-    
+
     val monthlyGoal by budgetViewModel.monthlyGoal.collectAsState()
     val context = LocalContext.current
-    
-    // ...
-    
-    // ...
+
+    val activeCyclePair by remember { mutableStateOf(ExpensePeriodManager.getActivePeriod(context)) }
+    var selectedFilter by remember { mutableStateOf<ExpensePeriodFilter>(ExpensePeriodFilter.AllTime) }
+    var showCustomRangeDialog by remember { mutableStateOf(false) }
+
+    val transactions = remember(rawTransactions, selectedFilter, activeCyclePair) {
+        ExpensePeriodFilterUtil.filterTransactions(
+            transactions = rawTransactions,
+            filter = selectedFilter,
+            activeStart = activeCyclePair?.first,
+            activeEnd = activeCyclePair?.second
+        )
+    }
 
     val income = transactions.filter { it.type.equals("Income", true) }.sumOf { it.amount }.toFloat()
     val expense = transactions.filter { it.type.equals("Expense", true) }.sumOf { it.amount }.toFloat()
@@ -76,6 +87,16 @@ fun DashboardScreen(
         SetBudgetDialog(
             budgetViewModel = budgetViewModel,
             onDismiss = { showBudgetDialog = false }
+        )
+    }
+
+    if (showCustomRangeDialog) {
+        CustomDateRangeDialog(
+            onDismiss = { showCustomRangeDialog = false },
+            onRangeSelected = { start, end ->
+                selectedFilter = ExpensePeriodFilter.CustomRange(start, end)
+                showCustomRangeDialog = false
+            }
         )
     }
 
@@ -106,14 +127,56 @@ fun DashboardScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+
+            // Period Selector Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedFilter is ExpensePeriodFilter.CurrentPeriod,
+                        onClick = { selectedFilter = ExpensePeriodFilter.CurrentPeriod },
+                        label = { Text("Current Cycle") },
+                        leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedFilter is ExpensePeriodFilter.ThisMonth,
+                        onClick = { selectedFilter = ExpensePeriodFilter.ThisMonth },
+                        label = { Text("This Month") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedFilter is ExpensePeriodFilter.CustomRange,
+                        onClick = { showCustomRangeDialog = true },
+                        label = {
+                            val text = (selectedFilter as? ExpensePeriodFilter.CustomRange)?.getLabel() ?: "Custom Range"
+                            Text(text)
+                        },
+                        leadingIcon = { Icon(Icons.Default.EditCalendar, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedFilter is ExpensePeriodFilter.AllTime,
+                        onClick = { selectedFilter = ExpensePeriodFilter.AllTime },
+                        label = { Text("All Time") }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             if (pendingTransactions.isNotEmpty()) {
                 PendingIndicator(
                     count = pendingTransactions.size,
                     onClick = onPendingClick
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
             }
 
             ModernBalanceCard(
@@ -137,7 +200,7 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SectionHeader("Recent Activity")
+                SectionHeader("Recent Activity (${transactions.size})")
                 TextButton(onClick = onViewAllClick) {
                     Text("See all", style = MaterialTheme.typography.labelLarge)
                 }
@@ -145,7 +208,7 @@ fun DashboardScreen(
 
             if (transactions.isEmpty()) {
                 Text(
-                    "No transactions yet",
+                    "No transactions found for ${selectedFilter.getLabel()}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -164,17 +227,17 @@ fun DashboardScreen(
             ModernTopCategories(categorySpending)
 
             Spacer(Modifier.height(24.dp))
-            
+
             FinancialTipCard(income, expense)
 
             Spacer(Modifier.height(24.dp))
-            
+
             ModernBudgetOverview(
                 totalExpense = expense,
                 monthlyBudget = budgetAmount,
                 onSetBudgetClick = { showBudgetDialog = true }
             )
-            
+
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -277,7 +340,7 @@ fun DashboardTopBarModern(
 
 @Composable
 fun AccountSelector(
-    accounts: List<com.example.expenceflow.data.db.Account>,
+    accounts: List<Account>,
     currentAccountId: Long?,
     onAccountSelected: (Long?) -> Unit
 ) {
@@ -296,7 +359,7 @@ fun AccountSelector(
                     .clip(RoundedCornerShape(20.dp))
                     .clickable { onAccountSelected(null) },
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = if (isSelected) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(modifier = Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -308,7 +371,7 @@ fun AccountSelector(
                 }
             }
         }
-        
+
         items(accounts) { account ->
             val isSelected = currentAccountId == account.id
             Surface(
@@ -327,7 +390,6 @@ fun AccountSelector(
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(4.dp))
-                    // Balance display for account could be added here if we had the account balances
                 }
             }
         }
@@ -352,8 +414,6 @@ fun ModernBalanceCard(
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Decorative background circles could be added here
-            
             Column(
                 modifier = Modifier
                     .padding(24.dp)
@@ -376,11 +436,10 @@ fun ModernBalanceCard(
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
-                        
-                        // New Velocity Badge
+
                         val dailyBudget = if (monthlyGoal > 0) (monthlyGoal / 30) else 0f
                         val isOverSpeed = (expense / 30) > dailyBudget && dailyBudget > 0
-                        
+
                         Surface(
                             color = if (isOverSpeed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(8.dp),
@@ -552,9 +611,9 @@ fun ModernTransactionItem(tx: Transaction) {
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     tx.title,
@@ -599,7 +658,7 @@ fun ModernTransactionItem(tx: Transaction) {
                     }
                 }
             }
-            
+
             Text(
                 "${if (isExpense) "-" else "+"} ₹%,.0f".format(tx.amount),
                 style = MaterialTheme.typography.titleMedium,
@@ -629,7 +688,7 @@ fun ModernTopCategories(categorySpending: List<Pair<String, Float>>) {
         categorySpending.forEach { (category, amount) ->
             var isHovered by remember { mutableStateOf(false) }
             val scale by animateFloatAsState(if (isHovered) 1.05f else 1f)
-            
+
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -656,7 +715,7 @@ fun ModernTopCategories(categorySpending: List<Pair<String, Float>>) {
                         "education" -> Icons.Default.School
                         else -> Icons.Default.Category
                     }
-                    
+
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -665,21 +724,21 @@ fun ModernTopCategories(categorySpending: List<Pair<String, Float>>) {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            icon, 
-                            null, 
+                            icon,
+                            null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        category, 
+                        category,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "₹%,.0f".format(amount), 
+                        "₹%,.0f".format(amount),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -700,7 +759,7 @@ fun ModernBudgetOverview(
     val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
     val currentDay = calendar.get(Calendar.DAY_OF_MONTH)
     val daysLeft = (daysInMonth - currentDay).coerceAtLeast(1)
-    
+
     val dailyBudget = if (monthlyBudget > 0) monthlyBudget / daysInMonth else 0f
     val remainingBudget = (monthlyBudget - totalExpense).coerceAtLeast(0f)
     val suggestedDaily = remainingBudget / daysLeft
@@ -731,9 +790,9 @@ fun ModernBudgetOverview(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
+
                     Spacer(Modifier.width(20.dp))
-                    
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Monthly Budget",
@@ -746,16 +805,16 @@ fun ModernBudgetOverview(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    
+
                     FilledTonalIconButton(onClick = onSetBudgetClick) {
                         Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp))
                     }
                 }
-                
+
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(16.dp))
-                
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     BudgetInfoItem("Daily Limit", "₹%,.0f".format(dailyBudget))
                     BudgetInfoItem("Days Left", "$daysLeft days")
@@ -763,7 +822,7 @@ fun ModernBudgetOverview(
                 }
             }
         }
-        
+
         if (progress > 0.8f) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
