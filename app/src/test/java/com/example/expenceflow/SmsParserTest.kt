@@ -88,6 +88,27 @@ class SmsParserTest {
     }
 
     @Test
+    fun testStyleUnionPromotionalSmsIgnored() {
+        val sms = "Style Union Stores: Get Rs.300 OFF on your purchase of Rs.1999 & above! Use code STYLE300. Hurry offer ends tomorrow."
+        val candidate = smsParser.parse(sms, "STYLEU")
+        assertNull(candidate)
+    }
+
+    @Test
+    fun testCashbackOfferSmsIgnored() {
+        val sms = "Get up to Rs 500 cashback offer on paying via Paytm UPI at Swiggy. Valid on first 3 orders."
+        val candidate = smsParser.parse(sms, "PAYTM")
+        assertNull(candidate)
+    }
+
+    @Test
+    fun testCreditCardLimitSmsIgnored() {
+        val sms = "Your HDFC Bank Credit Card limit is Rs 1,00,000. Apply for instant loan up to Rs 50,000 now."
+        val candidate = smsParser.parse(sms, "HDFCBK")
+        assertNull(candidate)
+    }
+
+    @Test
     fun testOtpSmsIgnored() {
         val sms = "Your OTP for net banking login is 482910. Do not share with anyone."
         val candidate = smsParser.parse(sms, "VM-SBI")

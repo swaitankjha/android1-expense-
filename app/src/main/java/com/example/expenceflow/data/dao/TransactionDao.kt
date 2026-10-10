@@ -5,13 +5,13 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.example.expenceflow.data.db.Transaction
 import kotlinx.coroutines.flow.Flow
-import androidx.room.Update
+
 @Dao
 interface TransactionDao {
 
-    // ✅ Renamed from 'insert' to 'insertTransaction' to match Repository
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction)
 
@@ -46,8 +46,32 @@ interface TransactionDao {
         type: String,
         month: String
     ): Double?
+
+    @Query("""
+        SELECT * FROM transactions 
+        WHERE amount = :amount 
+        AND type = :type
+        AND (
+            title = :merchant 
+            OR title = 'Merchant' 
+            OR :merchant = 'Merchant'
+            OR title LIKE '%' || :merchant || '%' 
+            OR :merchant LIKE '%' || title || '%'
+        )
+        AND abs(date - :date) <= :timeWindowMs
+        LIMIT 1
+    """)
+    suspend fun findDuplicateTransaction(
+        amount: Double,
+        merchant: String,
+        date: Long,
+        type: String,
+        timeWindowMs: Long = 5 * 60 * 1000
+    ): Transaction?
+
     @Update
     suspend fun updateTransaction(transaction: Transaction)
+
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
 }

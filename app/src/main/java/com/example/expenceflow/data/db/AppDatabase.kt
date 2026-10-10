@@ -5,12 +5,13 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.expenceflow.data.dao.AccountDao
 import com.example.expenceflow.data.dao.BudgetDao
+import com.example.expenceflow.data.dao.DetectionDiagnosticDao
 import com.example.expenceflow.data.dao.PendingTransactionDao
 import com.example.expenceflow.data.dao.TransactionDao
 
 @Database(
-    entities = [Transaction::class, BudgetGoal::class, Account::class, PendingTransaction::class],
-    version = 6,
+    entities = [Transaction::class, BudgetGoal::class, Account::class, PendingTransaction::class, DetectionDiagnostic::class],
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -20,6 +21,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun accountDao(): AccountDao
     abstract fun pendingTransactionDao(): PendingTransactionDao
-
-    // The companion object is deleted because Hilt now creates the database.
+    abstract fun detectionDiagnosticDao(): DetectionDiagnosticDao
 }

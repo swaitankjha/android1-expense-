@@ -3,16 +3,15 @@ package com.example.expenceflow.data.auto
 import android.util.Log
 import com.example.expenceflow.data.dao.PendingTransactionDao
 import com.example.expenceflow.data.repository.TransactionRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ExtractionEngine @Inject constructor(
     private val categorizationEngine: CategorizationEngine,
-    private val duplicateDetectionEngine: DuplicateDetectionEngine,
     private val repository: TransactionRepository,
-    private val pendingTransactionDao: PendingTransactionDao
+    private val pendingTransactionDao: PendingTransactionDao,
+    private val diagnosticLogger: DiagnosticLogger
 ) {
     private val TAG = "ExtractionEngine"
 
@@ -28,27 +27,48 @@ class ExtractionEngine @Inject constructor(
         val enrichedCandidate = candidate.copy(category = finalCategory)
 
         if (enrichedCandidate.source == "SMS" || enrichedCandidate.source == "Notification") {
-            val existing = repository.getAllTransactions().first()
-            if (duplicateDetectionEngine.isDuplicate(enrichedCandidate, existing)) {
+            val existingTx = repository.findDuplicateTransaction(
+                amount = enrichedCandidate.amount,
+                merchant = enrichedCandidate.merchant,
+                date = enrichedCandidate.date,
+                type = enrichedCandidate.type
+            )
+            if (existingTx != null) {
                 Log.d(TAG, "Duplicate detected in main history for: ${enrichedCandidate.merchant} ₹${enrichedCandidate.amount}")
+                diagnosticLogger.log(
+                    stage = "DUPLICATE_FILTERED",
+                    source = enrichedCandidate.source,
+                    summary = "Filtered duplicate from main history: ₹${enrichedCandidate.amount} at ${enrichedCandidate.merchant}",
+                    isSuccess = true
+                )
                 return null
             }
 
-            val pendingList = pendingTransactionDao.getPendingTransactions().first()
-            val matchingPending = duplicateDetectionEngine.findMatchingPending(
+            val matchingPending = pendingTransactionDao.findDuplicatePending(
                 amount = enrichedCandidate.amount,
-                date = enrichedCandidate.date,
-                type = enrichedCandidate.type,
                 merchant = enrichedCandidate.merchant,
-                pendingTransactions = pendingList
+                date = enrichedCandidate.date,
+                type = enrichedCandidate.type
             )
             if (matchingPending != null) {
                 Log.d(TAG, "Duplicate detected in pending list for: ${enrichedCandidate.merchant} ₹${enrichedCandidate.amount}")
+                diagnosticLogger.log(
+                    stage = "DUPLICATE_FILTERED",
+                    source = enrichedCandidate.source,
+                    summary = "Filtered duplicate from pending list: ₹${enrichedCandidate.amount} at ${enrichedCandidate.merchant}",
+                    isSuccess = true
+                )
                 return null
             }
         }
 
-        Log.d(TAG, "Candidate enriched and ready: $enrichedCandidate")
+        diagnosticLogger.log(
+            stage = "PARSER_CANDIDATE",
+            source = enrichedCandidate.source,
+            summary = "Enriched candidate ready: ₹${enrichedCandidate.amount} at ${enrichedCandidate.merchant}",
+            isSuccess = true
+        )
+
         return enrichedCandidate
     }
 }

@@ -77,7 +77,6 @@ class MainActivity : ComponentActivity() {
         }
         permissions.add(Manifest.permission.READ_SMS)
         permissions.add(Manifest.permission.RECEIVE_SMS)
-        permissions.add(Manifest.permission.READ_PHONE_STATE)
 
         permissions.forEach { perm ->
             val isGranted = ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED

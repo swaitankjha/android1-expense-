@@ -14,6 +14,19 @@ class SmsParser @Inject constructor() {
         "txn", "transaction", "transfer", "trf", "withdrawn", "deposited", "refund", "purchase", "payment"
     )
 
+    private val completedActionVerbs = listOf(
+        "debited", "credited", "spent", "paid", "transferred", "withdrawn", "deposited", "sent to", "received from", "trf to"
+    )
+
+    private val promotionalKeywords = listOf(
+        "off", "discount", "offer", "voucher", "coupon", "use code", "apply code",
+        "promo", "sale", "flat rs", "flat ₹", "flat inr", "get rs", "get ₹", "get inr",
+        "save rs", "save ₹", "save inr", "win rs", "win ₹", "cashback offer", "cashback up to",
+        "cashback on", "free", "congratulations", "hurry", "limited time", "expires",
+        "click link", "click here", "download app", "avail now", "shop now", "apply now",
+        "card limit", "credit limit", "available limit", "loan offer"
+    )
+
     private val incomeKeywords = listOf(
         "credited", "received", "added", "deposited", "refund", "cashback", "salary", "recd"
     )
@@ -47,6 +60,7 @@ class SmsParser @Inject constructor() {
 
         val lowerBody = smsBody.lowercase()
 
+        // 1. Filter out OTP/authentication messages
         if (lowerBody.contains("otp") || lowerBody.contains("verification code") || lowerBody.contains("secret code")) {
             if (!transactionKeywords.any { lowerBody.contains(it) }) {
                 Log.d(TAG, "SMS ignored: OTP message without transaction indicator")
@@ -54,6 +68,16 @@ class SmsParser @Inject constructor() {
             }
         }
 
+        // 2. Filter out promotional offers, discounts, coupons, and marketing ads unless an explicit transaction verb exists
+        val isPromotional = promotionalKeywords.any { lowerBody.contains(it) }
+        val hasCompletedAction = completedActionVerbs.any { lowerBody.contains(it) }
+
+        if (isPromotional && !hasCompletedAction) {
+            Log.d(TAG, "SMS ignored: Promotional offer/discount or marketing ad without completed transaction verb")
+            return null
+        }
+
+        // 3. Ensure SMS contains financial keywords or currency symbols
         val hasFinancialKeyword = transactionKeywords.any { lowerBody.contains(it) }
         val hasCurrencySymbol = lowerBody.contains("rs") || lowerBody.contains("inr") ||
                                 lowerBody.contains("₹") || lowerBody.contains("amt") ||

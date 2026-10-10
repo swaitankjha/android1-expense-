@@ -23,4 +23,27 @@ interface PendingTransactionDao {
 
     @Query("SELECT * FROM pending_transactions WHERE amount = :amount AND merchant = :merchant AND date = :date LIMIT 1")
     suspend fun getExistingPending(amount: Double, merchant: String, date: Long): PendingTransaction?
+
+    @Query("""
+        SELECT * FROM pending_transactions 
+        WHERE amount = :amount 
+        AND type = :type
+        AND status = 'PENDING'
+        AND (
+            merchant = :merchant 
+            OR merchant = 'Merchant' 
+            OR :merchant = 'Merchant'
+            OR merchant LIKE '%' || :merchant || '%' 
+            OR :merchant LIKE '%' || merchant || '%'
+        )
+        AND abs(date - :date) <= :timeWindowMs
+        LIMIT 1
+    """)
+    suspend fun findDuplicatePending(
+        amount: Double,
+        merchant: String,
+        date: Long,
+        type: String,
+        timeWindowMs: Long = 5 * 60 * 1000
+    ): PendingTransaction?
 }
