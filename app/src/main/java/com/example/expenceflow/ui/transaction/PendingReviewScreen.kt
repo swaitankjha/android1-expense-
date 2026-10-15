@@ -258,7 +258,9 @@ fun PendingReviewScreen(
         var category by remember { mutableStateOf(pending.category) }
         var type by remember { mutableStateOf(pending.type) }
         var accountId by remember { mutableStateOf(1L) }
+        var paymentMode by remember { mutableStateOf(pending.paymentMode) }
 
+        val modes = listOf("Cash", "UPI", "Bank", "Card")
         val displayAccounts = if (accounts.isEmpty()) listOf(Account(id = 1L, name = "Personal")) else accounts
         val safeSelectedIndex = displayAccounts.indexOfFirst { it.id == accountId }.coerceIn(0, displayAccounts.size - 1)
 
@@ -308,6 +310,19 @@ fun PendingReviewScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    Text("Payment Mode", style = MaterialTheme.typography.labelSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                        modes.forEach { mode ->
+                            val isSelected = paymentMode.equals(mode, true)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { paymentMode = mode },
+                                label = { Text(mode, fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
                     Text("Select Money Space", style = MaterialTheme.typography.labelSmall)
                     ScrollableTabRow(
                         selectedTabIndex = safeSelectedIndex,
@@ -331,7 +346,8 @@ fun PendingReviewScreen(
                         pending = pending.copy(type = type),
                         title = title,
                         category = category,
-                        accountId = accountId
+                        accountId = accountId,
+                        paymentMode = paymentMode
                     )
                     selectedPending = null
                 }) {
@@ -362,12 +378,27 @@ fun PendingItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${if (pending.type == "Income") "💰" else "💸"} ₹${pending.amount}",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 18.sp,
-                    color = if (pending.type == "Income") Color(0xFF2E7D32) else Color(0xFFC62828)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${if (pending.type == "Income") "💰" else "💸"} ₹${pending.amount}",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        color = if (pending.type == "Income") Color(0xFF2E7D32) else Color(0xFFC62828)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = pending.paymentMode.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
                 Text(pending.merchant, fontWeight = FontWeight.Bold)
                 Text(
                     text = "Detected via ${pending.source} • ${

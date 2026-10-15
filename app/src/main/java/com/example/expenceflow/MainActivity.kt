@@ -152,7 +152,6 @@ fun BottomNavApp(
                 PendingReviewScreen(onBack = { navController.popBackStack() })
             }
 
-            composable("intelligence/scan") { ReceiptScanScreen(onBack = { navController.popBackStack() }) }
             composable("intelligence/import") { ImportCenterScreen(onBack = { navController.popBackStack() }) }
         }
     }

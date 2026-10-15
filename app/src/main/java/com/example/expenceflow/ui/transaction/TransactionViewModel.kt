@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.expenceflow.data.auto.DuplicateDetectionEngine
-import com.example.expenceflow.data.auto.ExtractionEngine
 import com.example.expenceflow.data.auto.SmsInboxScanner
 import com.example.expenceflow.data.dao.PendingTransactionDao
 import com.example.expenceflow.data.db.Account
@@ -115,7 +114,13 @@ class TransactionViewModel @Inject constructor(
         }
     }
 
-    fun confirmPendingTransaction(pending: PendingTransaction, title: String, category: String, accountId: Long) {
+    fun confirmPendingTransaction(
+        pending: PendingTransaction,
+        title: String,
+        category: String,
+        accountId: Long,
+        paymentMode: String = pending.paymentMode
+    ) {
         viewModelScope.launch {
             val account = accountRepository.getAllAccounts().first().find { it.id == accountId }?.name ?: "Personal"
             val transaction = Transaction(
@@ -125,7 +130,8 @@ class TransactionViewModel @Inject constructor(
                 type = pending.type,
                 category = category,
                 account = account,
-                accountId = accountId
+                accountId = accountId,
+                paymentMode = paymentMode
             )
             transactionRepository.insertTransaction(transaction)
             pendingTransactionDao.updateStatus(pending.id, "ADDED")
@@ -140,6 +146,7 @@ class TransactionViewModel @Inject constructor(
         date: Long,
         account: String,
         accountId: Long = 1,
+        paymentMode: String = "Cash",
         context: Context
     ) {
         viewModelScope.launch {
@@ -150,7 +157,8 @@ class TransactionViewModel @Inject constructor(
                 type = type,
                 category = category,
                 account = account,
-                accountId = accountId
+                accountId = accountId,
+                paymentMode = paymentMode
             )
             transactionRepository.insertTransaction(transaction)
 

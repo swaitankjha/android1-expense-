@@ -11,7 +11,7 @@ import com.example.expenceflow.data.dao.TransactionDao
 
 @Database(
     entities = [Transaction::class, BudgetGoal::class, Account::class, PendingTransaction::class, DetectionDiagnostic::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -12,6 +12,7 @@ data class Transaction(
     val date: Long,
     val type: String, // e.g., "Income", "Expense"
     val category: String, // e.g., "Food", "Salary"
-    val account: String = "Cash", // Added account field for multiple account support
-    val accountId: Long = 1 // New field linking to Account entity
+    val account: String = "Personal", // Money Space / Account name
+    val accountId: Long = 1, // Link to Account entity
+    val paymentMode: String = "UPI" // "Cash", "UPI", "Bank Transfer", "Card"
 )

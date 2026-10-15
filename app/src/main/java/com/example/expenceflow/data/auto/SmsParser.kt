@@ -31,19 +31,16 @@ class SmsParser @Inject constructor() {
         "credited", "received", "added", "deposited", "refund", "cashback", "salary", "recd"
     )
 
-    // Pattern 1: Currency before amount (e.g. Rs. 500, Rs 500.00, INR 1,250.50, ₹450, Amt 1000)
     private val currencyBeforeAmountPattern = Pattern.compile(
         "(?i)(?:Rs|INR|\\u20B9|Amt|Amount|USD|\\$)\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)",
         Pattern.CASE_INSENSITIVE
     )
 
-    // Pattern 2: Amount before currency (e.g. 500.00 Rs, 1250 INR, 450 ₹)
     private val amountBeforeCurrencyPattern = Pattern.compile(
         "(?i)([\\d,]+(?:\\.\\d{1,2})?)\\s*(?:Rs|INR|\\u20B9|USD|\\$)",
         Pattern.CASE_INSENSITIVE
     )
 
-    // Pattern 3: Financial verb/noun before amount (e.g. debited by 500.00, txn of 250, payment of 100)
     private val verbBeforeAmountPattern = Pattern.compile(
         "(?i)(?:debited|credited|spent|paid|received|sent|withdrawn|txn|transaction|transfer|trf|payment|purchase)\\s+(?:by|for|with|of|is)?\\s*(?:Rs|INR|\\u20B9|Amt)?\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)",
         Pattern.CASE_INSENSITIVE
@@ -60,7 +57,6 @@ class SmsParser @Inject constructor() {
 
         val lowerBody = smsBody.lowercase()
 
-        // 1. Filter out OTP/authentication messages
         if (lowerBody.contains("otp") || lowerBody.contains("verification code") || lowerBody.contains("secret code")) {
             if (!transactionKeywords.any { lowerBody.contains(it) }) {
                 Log.d(TAG, "SMS ignored: OTP message without transaction indicator")
@@ -68,16 +64,14 @@ class SmsParser @Inject constructor() {
             }
         }
 
-        // 2. Filter out promotional offers, discounts, coupons, and marketing ads unless an explicit transaction verb exists
         val isPromotional = promotionalKeywords.any { lowerBody.contains(it) }
         val hasCompletedAction = completedActionVerbs.any { lowerBody.contains(it) }
 
         if (isPromotional && !hasCompletedAction) {
-            Log.d(TAG, "SMS ignored: Promotional offer/discount or marketing ad without completed transaction verb")
+            Log.d(TAG, "SMS ignored: Promotional offer/discount or marketing ad")
             return null
         }
 
-        // 3. Ensure SMS contains financial keywords or currency symbols
         val hasFinancialKeyword = transactionKeywords.any { lowerBody.contains(it) }
         val hasCurrencySymbol = lowerBody.contains("rs") || lowerBody.contains("inr") ||
                                 lowerBody.contains("₹") || lowerBody.contains("amt") ||
@@ -90,14 +84,12 @@ class SmsParser @Inject constructor() {
 
         var amount: Double? = null
 
-        // Try Pattern 1 (Currency before amount)
         val matcher1 = currencyBeforeAmountPattern.matcher(smsBody)
         if (matcher1.find()) {
             val amountStr = matcher1.group(1)?.replace(",", "")
             amount = amountStr?.toDoubleOrNull()
         }
 
-        // Try Pattern 2 (Amount before currency)
         if (amount == null) {
             val matcher2 = amountBeforeCurrencyPattern.matcher(smsBody)
             if (matcher2.find()) {
@@ -106,7 +98,6 @@ class SmsParser @Inject constructor() {
             }
         }
 
-        // Try Pattern 3 (Verb before amount)
         if (amount == null) {
             val matcher3 = verbBeforeAmountPattern.matcher(smsBody)
             if (matcher3.find()) {
@@ -124,8 +115,9 @@ class SmsParser @Inject constructor() {
         val type = if (isIncome) "Income" else "Expense"
 
         val merchant = extractMerchant(smsBody, sender)
+        val mode = detectPaymentMode(smsBody)
 
-        Log.d(TAG, "Parsed Candidate: Amount=$amount, Merchant=$merchant, Type=$type")
+        Log.d(TAG, "Parsed Candidate: Amount=$amount, Merchant=$merchant, Type=$type, Mode=$mode")
 
         return TransactionCandidate(
             amount = amount,
@@ -135,8 +127,20 @@ class SmsParser @Inject constructor() {
             account = detectBank(smsBody, sender),
             type = type,
             confidence = 0.85f,
-            source = "SMS"
+            source = "SMS",
+            paymentMode = mode
         )
+    }
+
+    private fun detectPaymentMode(smsBody: String): String {
+        val lower = smsBody.lowercase()
+        return when {
+            lower.contains("upi") || lower.contains("vpa") || lower.contains("gpay") || lower.contains("phonepe") || lower.contains("paytm") -> "UPI"
+            lower.contains("card") || lower.contains("pos") || lower.contains("visa") || lower.contains("mastercard") -> "Card"
+            lower.contains("neft") || lower.contains("rtgs") || lower.contains("imps") || lower.contains("netbanking") || lower.contains("transfer") -> "Bank Transfer"
+            lower.contains("cash") || lower.contains("atm") -> "Cash"
+            else -> "UPI"
+        }
     }
 
     private fun extractMerchant(smsBody: String, sender: String): String {
@@ -159,7 +163,6 @@ class SmsParser @Inject constructor() {
     private fun cleanMerchantName(raw: String): String {
         var processed = raw
 
-        // Handle raw UPI patterns like UPI/30123456/Zomato or INF*Zomato*123
         if (processed.contains("/") || processed.contains("*")) {
             val segments = processed.split(Regex("[/*]"))
             val bestSegment = segments.firstOrNull { seg ->

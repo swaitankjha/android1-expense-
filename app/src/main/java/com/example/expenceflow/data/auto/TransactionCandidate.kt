@@ -6,9 +6,9 @@ data class TransactionCandidate(
     val category: String,
     val date: Long,
     val account: String,
-    val type: String, // "Income" or "Expense"
-    val isTypeConfident: Boolean = true,
+    val type: String,
     val notes: String = "",
-    val confidence: Float,
-    val source: String // "SMS", "Notification", "OCR", "Voice", "CSV", "PDF"
+    val confidence: Float = 1.0f,
+    val source: String,
+    val paymentMode: String = "UPI" // "Cash", "UPI", "Bank Transfer", "Card"
 )

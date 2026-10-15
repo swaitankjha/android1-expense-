@@ -62,7 +62,8 @@ class SmsInboxScanner @Inject constructor(
                                     date = finalCandidate.date,
                                     type = finalCandidate.type,
                                     source = "SMS Inbox",
-                                    accountSuffix = address
+                                    accountSuffix = address,
+                                    paymentMode = finalCandidate.paymentMode
                                 )
                                 val id = pendingTransactionDao.insertPendingTransaction(pending)
                                 if (id > 0) {

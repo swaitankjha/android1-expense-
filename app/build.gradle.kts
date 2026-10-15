@@ -104,7 +104,6 @@ dependencies {
     implementation(libs.vico.compose.m3)
 
     /* -------------------- Intelligence -------------------- */
-    implementation(libs.mlkit.text.recognition)
     implementation(libs.pdfbox.android)
     implementation(libs.poi.ooxml)
 

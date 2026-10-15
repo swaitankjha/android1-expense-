@@ -60,7 +60,8 @@ class TransactionNotificationListener : NotificationListenerService() {
                             date = finalCandidate.date,
                             type = finalCandidate.type,
                             source = "Notification",
-                            accountSuffix = packageName
+                            accountSuffix = packageName,
+                            paymentMode = finalCandidate.paymentMode
                         )
                         val id = pendingTransactionDao.insertPendingTransaction(pending)
                         if (id > 0) {

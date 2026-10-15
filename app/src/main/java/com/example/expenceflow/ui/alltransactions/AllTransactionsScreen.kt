@@ -393,19 +393,20 @@ fun ModernTransactionCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(4.dp)
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = when(tx.account.lowercase()) {
+                                imageVector = when (tx.paymentMode.lowercase()) {
                                     "cash" -> Icons.Default.Payments
                                     "upi" -> Icons.Default.QrCode
-                                    "bank" -> Icons.Default.AccountBalance
-                                    else -> Icons.Default.Wallet
+                                    "card" -> Icons.Default.CreditCard
+                                    "bank", "bank transfer" -> Icons.Default.AccountBalance
+                                    else -> Icons.Default.QrCode
                                 },
                                 contentDescription = null,
                                 modifier = Modifier.size(10.dp),
@@ -413,12 +414,25 @@ fun ModernTransactionCard(
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = tx.account.uppercase(),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                text = tx.paymentMode.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = tx.account.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }

@@ -112,7 +112,8 @@ class SmsReceiver @Inject constructor() : BroadcastReceiver() {
                                     date = finalCandidate.date,
                                     type = finalCandidate.type,
                                     source = "SMS",
-                                    accountSuffix = sender
+                                    accountSuffix = sender,
+                                    paymentMode = finalCandidate.paymentMode
                                 )
                                 val id = pendingTransactionDao.insertPendingTransaction(pending)
                                 if (id > 0) {

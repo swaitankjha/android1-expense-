@@ -20,5 +20,6 @@ data class PendingTransaction(
     val accountSuffix: String? = null,
     val source: String = "SMS",
     val status: String = "PENDING", // PENDING, ADDED, DISMISSED
-    val detectedAt: Long = System.currentTimeMillis()
+    val detectedAt: Long = System.currentTimeMillis(),
+    val paymentMode: String = "UPI" // "Cash", "UPI", "Bank Transfer", "Card"
 )

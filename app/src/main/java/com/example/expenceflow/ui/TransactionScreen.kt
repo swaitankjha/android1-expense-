@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -25,7 +26,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.expenceflow.data.db.Transaction
 import com.example.expenceflow.ui.transaction.TransactionViewModel
-import com.example.expenceflow.data.auto.VoiceEntrySheet
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,12 +37,6 @@ fun TransactionScreen(
 ) {
     val transactions by viewModel.allTransactions.collectAsState()
     val context = LocalContext.current
-
-    var showVoiceSheet by remember { mutableStateOf(false) }
-
-    if (showVoiceSheet) {
-        VoiceEntrySheet(onDismiss = { showVoiceSheet = false })
-    }
 
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
@@ -136,14 +130,15 @@ fun TransactionScreen(
                 TextButton(onClick = {
                     val amt = amount.toDoubleOrNull() ?: match.amount
                     viewModel.addTransaction(
-                        if (description.isNotBlank()) description else match.merchant,
-                        amt,
-                        type,
-                        category,
-                        selectedDate,
-                        paymentMode,
-                        selectedAccountId,
-                        context
+                        title = if (description.isNotBlank()) description else match.merchant,
+                        amount = amt,
+                        type = type,
+                        category = category,
+                        date = selectedDate,
+                        account = selectedAccount?.name ?: "Personal",
+                        accountId = selectedAccountId,
+                        paymentMode = paymentMode,
+                        context = context
                     )
                     description = ""
                     amount = ""
@@ -178,11 +173,13 @@ fun TransactionScreen(
                     // Intelligence entry
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        IntelligenceButton(icon = Icons.Default.Mic, label = "Voice", onClick = { showVoiceSheet = true })
-                        IntelligenceButton(icon = Icons.Default.CameraAlt, label = "OCR", onClick = { navController?.navigate("intelligence/scan") })
-                        IntelligenceButton(icon = Icons.Default.FileUpload, label = "Import", onClick = { navController?.navigate("intelligence/import") })
+                        IntelligenceButton(
+                            icon = Icons.Default.FileUpload,
+                            label = "Import Statements",
+                            onClick = { navController?.navigate("intelligence/import") }
+                        )
                     }
                 }
 
@@ -338,8 +335,9 @@ fun TransactionScreen(
                                         type = type,
                                         category = category,
                                         date = selectedDate,
-                                        account = paymentMode,
+                                        account = selectedAccount?.name ?: "Personal",
                                         accountId = selectedAccountId,
+                                        paymentMode = paymentMode,
                                         context = context
                                     )
                                     description = ""
@@ -476,8 +474,13 @@ fun AccountPicker(
 }
 
 @Composable
-fun IntelligenceButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+fun IntelligenceButton(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(56.dp)) {
             Icon(icon, contentDescription = label)
         }
@@ -613,7 +616,10 @@ fun EditTransactionDialog(transaction: Transaction, onDismiss: () -> Unit, onSav
     var title by remember { mutableStateOf(transaction.title) }
     var amount by remember { mutableStateOf(transaction.amount.toString()) }
     var date by remember { mutableStateOf(transaction.date) }
+    var paymentMode by remember { mutableStateOf(transaction.paymentMode) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    val modes = listOf("Cash", "UPI", "Bank", "Card")
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date)
@@ -635,6 +641,20 @@ fun EditTransactionDialog(transaction: Transaction, onDismiss: () -> Unit, onSav
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                
+                Text("Payment Mode", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    modes.forEach { mode ->
+                        val isSelected = paymentMode.equals(mode, true)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { paymentMode = mode },
+                            label = { Text(mode, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
                 Surface(onClick = { showDatePicker = true }, shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(Date(date)))
@@ -646,7 +666,7 @@ fun EditTransactionDialog(transaction: Transaction, onDismiss: () -> Unit, onSav
         confirmButton = {
             Button(onClick = {
                 val amt = amount.toDoubleOrNull() ?: transaction.amount
-                onSave(transaction.copy(title = title, amount = amt, date = date))
+                onSave(transaction.copy(title = title, amount = amt, date = date, paymentMode = paymentMode))
             }) { Text("Update") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
